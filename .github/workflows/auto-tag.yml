@@ -98,7 +98,7 @@ jobs:
         if: steps.semver.outputs.released == 'true'
         continue-on-error: true
         run: |
-          REPO_NAME="Vargo"
+          REPO_NAME="laravel-scoped-backup"
           REPO="${{ github.repository }}"
           BRANCH="main"
           VERSION="${{ steps.semver.outputs.version }}"
