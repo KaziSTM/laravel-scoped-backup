@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace KaziSTM\LaravelScopedBackup\Services;
 
+use FilesystemIterator;
 use Illuminate\Support\Facades\File;
 use KaziSTM\LaravelScopedBackup\DTO\BackupManifest;
 use KaziSTM\LaravelScopedBackup\Exceptions\BackupException;
@@ -91,7 +92,7 @@ class ArchiveManager
         }
 
         $iterator = new RecursiveIteratorIterator(
-            new RecursiveDirectoryIterator($realSourceDir, RecursiveDirectoryIterator::SKIP_DOTS),
+            new RecursiveDirectoryIterator($realSourceDir, FilesystemIterator::SKIP_DOTS),
             RecursiveIteratorIterator::LEAVES_ONLY
         );
 

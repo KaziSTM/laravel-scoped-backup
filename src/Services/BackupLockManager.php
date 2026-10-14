@@ -27,9 +27,7 @@ class BackupLockManager
 
     public function acquirePruneLock(int $ttlSeconds = 60): Lock
     {
-        $lock = Cache::lock(self::PRUNE_LOCK_KEY, $ttlSeconds);
-
-        return $lock;
+        return Cache::lock(self::PRUNE_LOCK_KEY, $ttlSeconds);
     }
 
     public function acquireScopedLock(string $scopeKey, int $ttlSeconds = 600): Lock

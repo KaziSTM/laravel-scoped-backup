@@ -23,6 +23,7 @@ class ScopedExporter
      * Export a scoped model/dataset definition into the target directory.
      *
      * @return array{stats: BackupStats, manifest: BackupManifest}
+     * @throws \Throwable
      */
     public function export(ScopedBackupDefinitionInterface $definition, string $stagingDir): array
     {
