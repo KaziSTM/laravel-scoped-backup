@@ -1,70 +1,39 @@
 # Laravel Scoped Backup (`kazistm/laravel-scoped-backup`)
 
 [![Software License](https://img.shields.io/badge/license-MIT-brightgreen.svg?style=flat-square)](LICENSE.md)
-[![PHP Version](https://img.shields.io/badge/php-%5E8.2%20%7C%20%5E8.3%20%7C%20%5E8.4%20%7C%20%5E8.5-blue.svg?style=flat-square)](docs/compatibility.md)
-[![Laravel Version](https://img.shields.io/badge/laravel-%5E11.0%20%7C%20%5E12.0%20%7C%20%5E13.0-red.svg?style=flat-square)](docs/compatibility.md)
+[![PHP Compatibility](https://badge.laravel.cloud/php-badge/KaziSTM/laravel-scoped-backup)](https://packagist.org/packages/KaziSTM/laravel-scoped-backup)
+[![Laravel Compatibility](https://badge.laravel.cloud/badge/kazistm/laravel-scoped-backup?style=flat)](https://packagist.org/packages/kazistm/laravel-scoped-backup)
 [![Tests Passing](https://img.shields.io/badge/tests-75%20passed%20(Pest)-success.svg?style=flat-square)](docs/testing.md)
 
-An enterprise-ready Laravel package providing dual backup strategies:
-1. **Full Database & Filesystem Backups:** Native, verified database dumps for PostgreSQL, MySQL, MariaDB, and SQLite, optional application filesystem inclusion, atomic ZIP archive packaging with cryptographic JSON manifests, streaming SHA-256 validation, and audit-preserving retention policies.
-2. **Deterministic Scoped Dataset Backups:** Chunked JSON Lines (`.jsonl`) streaming of explicitly scoped Eloquent models, related child graphs, and auxiliary entity collections with natural identity key matching, post-restore PostgreSQL sequence synchronization, and configurable transaction isolation.
-
-Includes built-in health monitoring, anomaly detection, distributed concurrency locks, and multi-channel notifications (Email and Webhooks).
+Laravel backup and recovery package providing dual backup strategies: **native full-database disaster recovery dumps** (PostgreSQL, MySQL, MariaDB, SQLite) and **surgical scoped Eloquent dataset snapshots** (portable JSON Lines streams with natural-key upsert restoration), accompanied by streaming cryptographic SHA-256 integrity verification, safe dry-run simulation, audit-preserving retention policies, and automated health monitoring.
 
 ---
 
-## The Problem This Package Solves
+## Key Capabilities & Differentiators
 
-Standard Laravel backup solutions excel at taking a snapshot of an entire database to remote object storage. However, real-world SaaS, multi-tenant, and regulated applications frequently encounter operational requirements that monolithic full backups cannot address:
+Standard Laravel backup solutions snapshot an entire database to remote object storage. While effective for monolithic disaster recovery, production SaaS, multi-tenant, and regulated systems routinely face operational needs that full-database snapshots cannot solve alone:
 
-- **Selective Tenant or Resource Recovery:** A customer accidentally deletes their project, workspace, or company data. Restoring an entire 500GB production database snapshot to recover one tenant is slow, risky, and disruptive.
-- **Data Portability & Migration:** Transferring a specific dataset (with its deep tree of relationships) between environments (e.g. Production to Staging) without exporting sensitive global tables (users, credentials, API keys).
-- **Audit-Preserving Retention:** Pruning expired storage files while permanently retaining the audit history of every backup event in your database.
-- **Disaster Recovery Preflight:** Verifying archive integrity, table of contents, and cryptographic checksums *before* attempting a destructive restore.
-
-`kazistm/laravel-scoped-backup` solves this by giving you both **native physical database backups** for full disaster recovery and **portable logical scoped backups** for surgical dataset exports and imports.
-
----
-
-## Architectural Comparison: Full vs. Scoped Backups
-
-| Feature | Full Database Backup | Scoped Dataset Backup |
-| :--- | :--- | :--- |
-| **Strategy** | Physical / Native utility dump | Logical Eloquent JSONL stream |
-| **Supported Engines** | PostgreSQL, MySQL, MariaDB, SQLite | All Eloquent-supported database engines |
-| **Scope** | Entire database schema, tables, sequences, routines | Root model, declared relations, auxiliary entities |
-| **Format** | Compressed dump (`.dump` / `.sql` / `.sqlite`) inside ZIP | Streaming JSON Lines (`data/*.jsonl`) inside ZIP |
-| **Filesystem Inclusion** | Optional (configurable disks and directories) | Optional auxiliary entity arrays |
-| **Restore Method** | Native engine restore (`pg_restore`, `mysql`, etc.) | Chunked Eloquent upsert with natural identity matching |
-| **Identity Resolution** | Physical primary keys and sequences recreated | Natural keys (`identity`) or primary key mapping |
-| **Production Safety** | Requires explicit `--force` confirmation | Non-destructive upsert / safe simulation with `--dry-run` |
-| **Primary Use Case** | Disaster recovery, catastrophic failure rollback | Tenant recovery, data portability, staging seeding |
+- **Surgical Tenant & Resource Recovery:** Recover a single tenant, workspace, or company dataset without restoring a 500GB production database snapshot or impacting other customers.
+- **Environment Data Portability:** Export specific domain models and relation graphs (e.g. from Production to Staging or local dev) without exposing global credentials, sensitive user passwords, or API keys.
+- **Cryptographic Archive Integrity:** Compute streaming SHA-256 checksums stored in machine-readable `manifest.json` files and verify archives before attempting destructive restores.
+- **Simulated Dry-Run Restorations:** Validate scoped dataset formatting, model resolution, and natural-key row matching without writing to the database.
+- **Audit-Preserving Retention:** Automatically prune expired physical backup archives from storage while permanently preserving tracking records, checksums, and execution metrics in the database.
+- **Comprehensive Health Monitoring:** Diagnose backup staleness (TTL), archive corruption, and storage size drop anomalies through an Artisan health check designed for uptime monitors and alerting systems.
 
 ---
 
-## Supported Database Engines
-
-| Database Engine | Native Backup Tool | Native Restore Tool | Supported Objects | Consistency Guarantee |
-| :--- | :--- | :--- | :--- | :--- |
-| **PostgreSQL** (12+) | `pg_dump` (`-F c` custom binary) | `pg_restore` (TOC verified) | Tables, views, sequences, triggers, functions | Transactional snapshot (`REPEATABLE READ`) |
-| **MySQL** (5.7, 8.0, 8.4+) | `mysqldump` (`--single-transaction`) | `mysql` client | Tables, views, triggers, routines, events | Point-in-time InnoDB snapshot |
-| **MariaDB** (10.3+) | `mariadb-dump` / `mysqldump` | `mariadb` / `mysql` client | Tables, views, triggers, routines, events | Point-in-time Aria/InnoDB snapshot |
-| **SQLite** (3.27+) | `VACUUM INTO` / native backup | Atomic file swap with WAL isolation | Tables, indexes, triggers, views | Full database page copy with WAL frame clearance |
-
-For detailed driver options, binary configuration, and engine caveats, see [Database Drivers Documentation](docs/database-drivers.md).
-
----
-
-## Requirements
+## Requirements & Compatibility
 
 - **PHP:** `^8.2`, `^8.3`, `^8.4`, or `^8.5`
 - **Laravel Framework:** `^11.0`, `^12.0`, or `^13.0`
 - **Required PHP Extensions:** `ext-zip`, `ext-json`, `ext-pdo`
-- **Required External Binaries** (for native full backups):
-  - PostgreSQL: `pg_dump`, `pg_restore`
-  - MySQL: `mysqldump`, `mysql`
-  - MariaDB: `mariadb-dump` (or `mysqldump`), `mariadb` (or `mysql`)
-  - SQLite: None (uses native PDO / SQLite engine)
+- **Supported Database Engines:**
+  - **PostgreSQL** (12+): Native `pg_dump` (`-F c` custom compressed binary) and `pg_restore` (TOC verified). Requires `pg_dump` and `pg_restore` client binaries.
+  - **MySQL** (5.7, 8.0, 8.4+): Native `mysqldump` (`--single-transaction`, `--quick`) and `mysql` client.
+  - **MariaDB** (10.3+): Native `mariadb-dump` / `mariadb` with automatic fallback to `mysqldump` and dynamic MariaDB detection.
+  - **SQLite** (3.27+): Native `SQLite3::backup()` online backup API with WAL frame clearance and atomic staging rollback. No external CLI binaries required (uses PHP `ext-sqlite3`).
+
+For full engine parameters, privilege requirements, and binary settings, see [Database Drivers Documentation](docs/database-drivers.md).
 
 ---
 
@@ -88,7 +57,7 @@ php artisan vendor:publish --tag=scoped-backup-migrations
 php artisan migrate
 ```
 
-For advanced setup details and multi-disk configuration, see [Installation Guide](docs/installation.md) and [Configuration Reference](docs/configuration.md).
+For advanced multi-disk configuration, see the [Installation Guide](docs/installation.md) and [Configuration Reference](docs/configuration.md).
 
 ---
 
@@ -96,25 +65,25 @@ For advanced setup details and multi-disk configuration, see [Installation Guide
 
 ### 1. Create a Full Database Backup
 
-Run a native database dump and archive it with a cryptographic manifest:
+Run an engine-native database dump packaged into an atomic ZIP archive with manifest:
 
 ```bash
-# Run backup with default connection, disk, and retention
+# Backup default connection to configured storage disk
 php artisan scoped-backup:full
 
-# Run backup targeting AWS S3 with filesystem inclusion and 14-day retention
+# Backup targeting S3 with filesystem inclusion, 14-day retention, and custom connection
 php artisan scoped-backup:full --connection=pgsql --disk=s3 --include-files --retention=14 --trigger=scheduled
 ```
 
 ### 2. Create a Scoped Eloquent Dataset Backup
 
-Snapshot an Eloquent model and its related graph into a portable JSONL archive:
+Snapshot an Eloquent model, declared relationships, and auxiliary collections into a portable JSONL archive:
 
 ```bash
-# Basic scoped backup
+# Basic scoped model export
 php artisan scoped-backup:scoped "App\Models\Company" --name=company-101
 
-# Scoped backup with relations, natural identity key, and custom chunk size
+# Scoped export with relationships, natural identity key, and custom chunk size
 php artisan scoped-backup:scoped "App\Models\Company" \
     --name=company-101 \
     --relations=departments \
@@ -124,12 +93,9 @@ php artisan scoped-backup:scoped "App\Models\Company" \
     --disk=s3
 ```
 
-> [!NOTE]
-> In v1.0, scoped dataset backups package root models and serialize declared relations into `records.jsonl`. Scoped restoration (`scoped-backup:restore --type=scoped`) imports and upserts root-model records into the target model table. Child relationships and auxiliary entities are preserved in the archive for auditing or custom extraction, but are not automatically cascade-inserted into child tables.
-
 ### 3. Check System Health & Freshness
 
-Diagnose backup staleness, storage size anomalies, record count shifts, and archive corruption:
+Evaluate backup freshness, storage size drop anomalies, and archive SHA-256 integrity:
 
 ```bash
 php artisan scoped-backup:monitor
@@ -137,49 +103,81 @@ php artisan scoped-backup:monitor
 
 ### 4. Prune Expired Backups
 
-Enforce retention policies while preserving database audit logs:
+Enforce retention limits while preserving audit rows in your database:
 
 ```bash
-# Prune all expired backups according to config defaults
+# Prune using configured retention defaults
 php artisan scoped-backup:prune
 
-# Prune with an explicit retention limit on full backups only
+# Override retention count on full backups only
 php artisan scoped-backup:prune --retention=7 --type=full
 ```
 
 ### 5. Restore a Backup
 
-Safely restore from full database dumps or scoped datasets:
+Restore from full database dumps or scoped datasets by Backup ID or file path:
 
 ```bash
-# Preview scoped restore without modifying the database (dry-run)
+# Preview scoped restore without modifying the database (dry-run simulation)
 php artisan scoped-backup:restore 42 --type=scoped --dry-run
 
-# Restore scoped dataset archive
+# Live restore of a scoped dataset archive
 php artisan scoped-backup:restore 42 --type=scoped
 
-# Restore full database backup (prompts for interactive safety confirmation in production)
+# Pre-flight verify a full backup without restoring
+php artisan scoped-backup:restore 42 --type=full --verify-only
+
+# Restore full database backup (prompts for confirmation in production, or pass --force)
 php artisan scoped-backup:restore 42 --type=full --force
 
 # Restore full backup into an isolated staging/recovery connection
 php artisan scoped-backup:restore 42 --type=full --connection=pgsql_recovery
 ```
 
-For complete restoration workflows, see [Restoration Guide](docs/restoration.md).
+---
+
+## Architectural Comparison: Full vs. Scoped Backups
+
+| Feature | Full Database Backup | Scoped Dataset Backup |
+| :--- | :--- | :--- |
+| **Strategy** | Native engine dump (CLI utility / online backup API) | Logical Eloquent JSONL stream |
+| **Supported Engines** | PostgreSQL, MySQL, MariaDB, SQLite | All Eloquent-supported database engines |
+| **Scope** | Entire database schema, tables, routines, sequences | Root model, declared relations, auxiliary entities |
+| **Archive Format** | Dump artifact (`.dump` / `.sql` / `.sqlite`) inside ZIP | Streaming JSON Lines (`data/*.jsonl`) inside ZIP |
+| **Filesystem Inclusion** | Optional (configurable disks and directories) | Optional auxiliary entity JSON collections |
+| **Restore Method** | Native engine restore (`pg_restore`, `mysql`, etc.) | Chunked Eloquent upsert with natural identity matching |
+| **Identity Resolution** | Physical primary keys and sequences recreated | Natural keys (`identity`) or primary key mapping |
+| **Production Safety** | Requires explicit `--force` confirmation | Non-destructive upsert / safe simulation with `--dry-run` |
+| **Primary Use Case** | Disaster recovery, catastrophic failure rollback | Tenant recovery, data portability, staging seeding |
+
+---
+
+## Important Restoration Limitations & Safety Considerations
+
+- **Root-Model Scope during Scoped Restore:**
+  `ScopedExporter` packages root model records and serializes declared relations into `records.jsonl`, plus supplementary entities into `entities/`. During restoration, `ScopedImporter` imports and upserts root model records into the target model table. Eager-loaded child relationships and auxiliary entity arrays are preserved in the archive for auditing, inspection, or custom extraction, but are **not automatically cascade-inserted** into child tables by `ScopedImporter`.
+- **Target Schema Prerequisite:**
+  Scoped backups export data records, not table DDL, schema definitions, or database views. Target database tables must already exist before performing a scoped restore.
+- **Simulated vs. Live Restore:**
+  `--dry-run` mode parses JSON Lines records, resolves target models, and computes match metrics against current database rows without writing to disk. A successful dry run verifies archive format and model resolution, but **does not guarantee** that a live restore will succeed under concurrent writes or unmodeled database-level foreign key constraints.
+- **Production Restore Guard:**
+  Destructive full database restorations are blocked in production environments (`APP_ENV=production`) unless `--force` is explicitly passed or confirmed interactively. Always prefer testing restores into an isolated recovery connection (`--connection=pgsql_recovery`).
+
+For full restoration mechanics, see the [Restoration Guide](docs/restoration.md).
 
 ---
 
 ## Programmatic API
 
-The package provides dedicated Action classes for seamless programmatic execution from jobs, controllers, or scheduled commands.
+The package provides dedicated single-responsibility Action classes designed for dependency injection:
 
 ### Defining and Running a Scoped Backup
 
 ```php
+use App\Models\AuditLog;
+use App\Models\Company;
 use KaziSTM\LaravelScopedBackup\Actions\CreateScopedBackupAction;
 use KaziSTM\LaravelScopedBackup\Support\ScopedBackupDefinition;
-use App\Models\Company;
-use App\Models\AuditLog;
 
 $definition = (new ScopedBackupDefinition('company-acme'))
     ->model(Company::class, fn ($query) => $query->where('slug', 'acme-corp'))
@@ -237,7 +235,7 @@ $stats = $action->execute(
     ]
 );
 
-echo "Processed {$stats->recordsProcessed} records (Created: {$stats->recordsCreated}, Updated: {$stats->recordsUpdated})";
+echo "Processed {$stats->totalProcessed()} records (Created: {$stats->recordsCreated}, Updated: {$stats->recordsUpdated})";
 ```
 
 ### Programmatic Health Diagnostics
@@ -255,7 +253,22 @@ if (! $result->isHealthy) {
 }
 ```
 
-For complete API signatures and data transfer objects, see [Programmatic API](docs/programmatic-api.md).
+For complete method signatures, DTO properties, and event payloads, see the [Programmatic API Reference](docs/programmatic-api.md).
+
+---
+
+## Testing
+
+The package includes an extensive test suite authored in [Pest](https://pestphp.com/) covering unit tests, feature workflows, mock driver validations, and audit regression tests:
+
+```bash
+# Run tests using Pest
+composer test
+# or
+vendor/bin/pest
+```
+
+Unit and feature tests execute in complete isolation without requiring external database services (using SQLite in-memory fixtures and mocked database drivers). Dedicated integration tests for PostgreSQL, MySQL, MariaDB, and SQLite WAL are configurable via environment variables (see [Testing Guide](docs/testing.md)).
 
 ---
 
@@ -286,21 +299,6 @@ Comprehensive guides and architectural specifications are available in the [`doc
 | [**Architecture**](docs/architecture.md) | High-level system design, pipeline flowcharts, and sequence diagrams. |
 | [**Compatibility**](docs/compatibility.md) | Matrix of supported PHP, Laravel, and database engine versions. |
 | [**Changelog**](docs/changelog.md) | Detailed release notes and historical change log. |
-
----
-
-## Testing
-
-The package includes a comprehensive test suite authored in [Pest](https://pestphp.com/) covering unit tests, feature tests, driver mocks, and audit regression tests:
-
-```bash
-# Run tests using Pest
-composer test
-# or
-vendor/bin/pest
-```
-
-Unit and feature tests run in complete isolation without requiring external database services (using SQLite in-memory fixtures and mocked database drivers). Real database integration tests are isolated and configured via environment variables (see [Testing Guide](docs/testing.md)).
 
 ---
 

@@ -1,6 +1,6 @@
 {
     "name": "kazistm/laravel-scoped-backup",
-    "description": "Verified full database/filesystem backups and dynamically scoped Eloquent dataset snapshots for Laravel across PostgreSQL, MySQL, MariaDB, and SQLite.",
+    "description": "Laravel backup and recovery package for full-database backups and scoped Eloquent data exports and restores, with integrity verification, dry-run validation, retention policies, and health monitoring.",
     "type": "library",
     "keywords": [
         "laravel",
