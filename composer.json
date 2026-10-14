@@ -1,0 +1,74 @@
+{
+    "name": "kazistm/laravel-scoped-backup",
+    "description": "Verified full database/filesystem backups and dynamically scoped Eloquent dataset snapshots for Laravel across PostgreSQL, MySQL, MariaDB, and SQLite.",
+    "type": "library",
+    "keywords": [
+        "laravel",
+        "backup",
+        "database-backup",
+        "database-restore",
+        "eloquent",
+        "scoped-backup",
+        "dataset-export",
+        "postgresql",
+        "mysql",
+        "mariadb",
+        "sqlite",
+        "retention",
+        "monitoring",
+        "disaster-recovery"
+    ],
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "KaziSTM",
+            "email": "youcef.nezrek@gmail.com",
+            "role": "Developer"
+        }
+    ],
+    "require": {
+        "php": "^8.2|^8.3|^8.4|^8.5",
+        "ext-json": "*",
+        "ext-pdo": "*",
+        "ext-zip": "*",
+        "illuminate/console": "^11.0|^12.0|^13.0",
+        "illuminate/contracts": "^11.0|^12.0|^13.0",
+        "illuminate/database": "^11.0|^12.0|^13.0",
+        "illuminate/filesystem": "^11.0|^12.0|^13.0",
+        "illuminate/support": "^11.0|^12.0|^13.0",
+        "symfony/process": "^7.0|^8.0"
+    },
+    "require-dev": {
+        "mockery/mockery": "^1.6",
+        "orchestra/testbench": "^9.0|^10.0",
+        "phpunit/phpunit": "^11.0|^12.0"
+    },
+    "suggest": {
+        "ext-sqlite3": "Required when using the SQLite database backup driver",
+        "ext-pdo_pgsql": "Required when connecting to PostgreSQL databases",
+        "ext-pdo_mysql": "Required when connecting to MySQL or MariaDB databases"
+    },
+    "autoload": {
+        "psr-4": {
+            "KaziSTM\\LaravelScopedBackup\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "KaziSTM\\LaravelScopedBackup\\Tests\\": "tests/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "KaziSTM\\LaravelScopedBackup\\ScopedBackupServiceProvider"
+            ]
+        }
+    },
+    "config": {
+        "sort-packages": true,
+        "preferred-install": "dist"
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true
+}

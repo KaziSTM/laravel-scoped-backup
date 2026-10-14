@@ -1,0 +1,10 @@
+/vendor/
+/.phpunit.cache/
+.phpunit.result.cache
+composer.phar
+.env
+.env.backup
+.env.*
+*.log
+.DS_Store
+Thumbs.db
