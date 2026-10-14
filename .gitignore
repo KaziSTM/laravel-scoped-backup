@@ -8,3 +8,20 @@ composer.phar
 *.log
 .DS_Store
 Thumbs.db
+
+# Backup Archives & Temporary Dumps
+*.zip
+*.tar.gz
+*.sql
+*.sql.gz
+*.jsonl
+
+# IDE & Editor Configurations
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace
+
+# Build and Testing Artifacts
+/build/
+/coverage/
