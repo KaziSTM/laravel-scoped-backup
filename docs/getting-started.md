@@ -150,15 +150,19 @@ php artisan scoped-backup:restore 1 --type=full --verify-only
 
 ### Dry-Run Restoration (Scoped Backup)
 
-Simulate scoped dataset restoration to view what records would be created or updated without modifying the database:
+Simulate scoped dataset restoration by Backup ID or archive path without modifying the database:
 
 ```bash
+php artisan scoped-backup:restore 2 --type=scoped --dry-run
+# or by file path:
 php artisan scoped-backup:restore storage/app/backups/scoped_users.zip --dry-run
 ```
 
 ### Performing a Scoped Dataset Restore
 
 ```bash
+php artisan scoped-backup:restore 2 --type=scoped
+# or by file path:
 php artisan scoped-backup:restore storage/app/backups/scoped_users.zip
 ```
 

@@ -21,7 +21,7 @@ This document details declared compatibility versus actually verified and integr
 | :--- | :--- | :--- | :--- |
 | **Laravel 11.x** | Yes (`^11.0`) | Orchestra Testbench `^9.0` | **Actively Verified** |
 | **Laravel 12.x** | Yes (`^12.0`) | Orchestra Testbench `^10.0` | **Actively Verified** |
-| **Laravel 13.x** | Yes (`^13.0`) | N/A (Pre-release) | Forward-compatible constraint |
+| **Laravel 13.x** | Yes (`^13.0`) | Live Application Testing | **Actively Verified** |
 
 ---
 

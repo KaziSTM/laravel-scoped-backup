@@ -3,7 +3,7 @@
 [![Software License](https://img.shields.io/badge/license-MIT-brightgreen.svg?style=flat-square)](LICENSE.md)
 [![PHP Version](https://img.shields.io/badge/php-%5E8.2%20%7C%20%5E8.3%20%7C%20%5E8.4%20%7C%20%5E8.5-blue.svg?style=flat-square)](docs/compatibility.md)
 [![Laravel Version](https://img.shields.io/badge/laravel-%5E11.0%20%7C%20%5E12.0%20%7C%20%5E13.0-red.svg?style=flat-square)](docs/compatibility.md)
-[![Tests Passing](https://img.shields.io/badge/tests-84%20tests%20(Pest)-success.svg?style=flat-square)](docs/testing.md)
+[![Tests Passing](https://img.shields.io/badge/tests-75%20passed%20(Pest)-success.svg?style=flat-square)](docs/testing.md)
 
 An enterprise-ready Laravel package providing dual backup strategies:
 1. **Full Database & Filesystem Backups:** Native, verified database dumps for PostgreSQL, MySQL, MariaDB, and SQLite, optional application filesystem inclusion, atomic ZIP archive packaging with cryptographic JSON manifests, streaming SHA-256 validation, and audit-preserving retention policies.
@@ -72,39 +72,10 @@ For detailed driver options, binary configuration, and engine caveats, see [Data
 
 ### 1. Install via Composer
 
-Once the package is available on Packagist, install it via:
+Install the package into your application via Composer:
 
 ```bash
 composer require kazistm/laravel-scoped-backup
-```
-
-### Local Path Repository (Development)
-
-For local development or testing before public release, configure a Composer path repository in your application's `composer.json`:
-
-```json
-"repositories": [
-    {
-        "type": "path",
-        "url": "../laravel-scoped-backup",
-        "options": {
-            "symlink": true
-        }
-    }
-],
-"require": {
-    "kazistm/laravel-scoped-backup": "@dev"
-}
-```
-
-> [!NOTE]
-> Adjust the `url` relative to your application's `composer.json` location, or replace it with an appropriate absolute path.
-
-Link the package and regenerate Composer's autoloader:
-
-```bash
-composer update kazistm/laravel-scoped-backup
-composer dump-autoload
 ```
 
 ### 2. Publish Configuration & Migration

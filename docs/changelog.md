@@ -29,12 +29,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Automated health monitoring checking for stale backups, storage size anomalies, record count shifts, and corrupted archive integrity.
   - Multi-channel notification dispatcher supporting Email (`MailMessage`) and Discord/Slack Webhooks.
   - Rich Artisan CLI suite:
-    - `backup:run` (Full database and filesystem backup)
-    - `backup:scoped` (Scoped Eloquent dataset backup)
-    - `backup:restore` (Full and scoped restoration with dry-run support)
-    - `backup:list` (Tabular listing with status and disk info)
-    - `backup:prune` (Automated cleanup of expired archives)
-    - `backup:monitor` (Health and integrity diagnostics with exit codes)
+    - `scoped-backup:full` (Full database and filesystem backup)
+    - `scoped-backup:scoped` (Scoped Eloquent dataset backup)
+    - `scoped-backup:restore` (Full and scoped restoration with dry-run support)
+    - `scoped-backup:prune` (Automated cleanup of expired archives)
+    - `scoped-backup:monitor` (Health and integrity diagnostics with exit codes)
 - **Security & Integrity Hardening**:
   - Zip Slip path traversal mitigation with strict directory containment verification.
   - Restricted archive and temporary extraction directory permissions (`0700`).

@@ -77,9 +77,11 @@ Restoration resolves existing records by matching the `identity_keys` declared i
 
 ### Dry-Run Restoration (`--dry-run`)
 
-Simulate restoration without persisting changes:
+Simulate restoration without persisting changes (by Backup ID or path):
 
 ```bash
+php artisan scoped-backup:restore 2 --type=scoped --dry-run
+# or by archive file path:
 php artisan scoped-backup:restore storage/app/backups/scoped_users.zip --dry-run
 ```
 

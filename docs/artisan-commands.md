@@ -88,10 +88,12 @@ php artisan scoped-backup:restore
 ### Examples
 
 ```bash
-# Dry-run preview of a scoped dataset restore
+# Dry-run preview of a scoped dataset restore using Backup ID or path
+php artisan scoped-backup:restore 2 --type=scoped --dry-run
 php artisan scoped-backup:restore storage/app/backups/scoped_users.zip --dry-run
 
-# Live restore of a scoped backup
+# Live restore of a scoped backup by Backup ID or path
+php artisan scoped-backup:restore 2 --type=scoped
 php artisan scoped-backup:restore storage/app/backups/scoped_users.zip
 
 # Pre-flight verify a full backup without restoring
