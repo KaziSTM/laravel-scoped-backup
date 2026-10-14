@@ -50,11 +50,11 @@ Supports two payload formats:
 ```json
 {
     "event": "backup_failed",
-    "title": "Backup Failed: company_radar",
+    "title": "Backup Failed: app_production",
     "message": "Backup [ID: 42] failed: pg_dump process timed out",
     "context": {
         "backup_id": 42,
-        "database": "company_radar",
+        "database": "app_production",
         "driver": "pgsql",
         "duration": "600.12s"
     },

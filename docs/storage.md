@@ -82,5 +82,5 @@ In `.env`:
 
 ```dotenv
 BACKUP_STORAGE_DISK=backups_s3
-BACKUP_STORAGE_PATH=backups/company_radar
+BACKUP_STORAGE_PATH=backups/app_production
 ```

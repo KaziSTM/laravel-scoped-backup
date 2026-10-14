@@ -27,9 +27,11 @@ Contributions are welcome! This document outlines guidelines for contributing to
 4. Add comprehensive unit and feature tests covering both happy and failure paths.
 5. Run the test suite:
    ```bash
-   vendor/bin/phpunit
+   composer test
+   # or
+   vendor/bin/pest
    ```
-   *Note*: Unit and Feature tests execute using in-memory SQLite without requiring external databases. To run real database integration tests locally, set the corresponding `DB_*_HOST` variables in your environment (see [Testing Guide](testing.md)).
+   *Note*: Unit and Feature tests execute using in-memory SQLite without requiring external databases. To run real database integration tests locally, set the corresponding `DB_*_HOST` variables in your environment (see [Testing Guide](testing.md)). All tests must be authored in Pest.
 6. Commit with clear, descriptive commit messages.
 
 ---

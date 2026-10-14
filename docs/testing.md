@@ -1,6 +1,6 @@
 # Testing & Verification Guide
 
-The package includes a comprehensive automated test suite powered by [Orchestra Testbench](https://github.com/orchestral/testbench) and [PHPUnit](https://phpunit.de/).
+The package includes a comprehensive automated test suite powered by [Orchestra Testbench](https://github.com/orchestral/testbench) and [Pest](https://pestphp.com/).
 
 ---
 
@@ -8,6 +8,7 @@ The package includes a comprehensive automated test suite powered by [Orchestra 
 
 ```text
 tests/
+├── Pest.php                             # Pest global configuration, test traits, and environment helpers
 ├── TestCase.php                         # Base Testbench TestCase with migrations & sqlite memory setup
 ├── Fixtures/
 │   └── User.php                         # Model fixture for standalone scoped tests
@@ -25,11 +26,11 @@ tests/
 │   ├── HealthMonitoringTest.php         # Freshness TTL, size anomaly, and checksum checks
 │   ├── MultiDriverFullBackupTest.php    # Real SQLite end-to-end full backup and restore
 │   ├── NotificationTest.php             # Discord webhook and email dispatch assertions
+│   ├── RemoteStorageSecurityLifecycleTest.php # Remote disk stream operations and permissions
 │   ├── ScopedBackupTest.php             # Scoped dataset export, chunking, and JSONL creation
+│   ├── ScopedRestorationSafetyTest.php  # Event suppression, ambiguous identity, and transaction rollback
 │   └── ScopedRestoreTest.php            # Scoped dataset upsert and dry-run assertions
 └── Integration/
-    ├── Concerns/
-    │   └── InteractsWithRealDatabases.php # CI detection and failure/skip handling
     ├── MariaDbRealDriverIntegrationTest.php # Real MariaDB dump, archive verification, and restore
     ├── MySqlRealDriverIntegrationTest.php   # Real MySQL dump, archive verification, and restore
     ├── PostgreSqlRealDriverIntegrationTest.php # Real PostgreSQL custom dump and restore
@@ -49,26 +50,31 @@ Ensure development dependencies are installed via Composer:
 composer install
 ```
 
-Run PHPUnit:
+Run Pest via Composer script or binary:
 
 ```bash
-vendor/bin/phpunit
+composer test
+# or
+vendor/bin/pest
 ```
 
 ### 2. Filtering Specific Suites or Tests
 
 ```bash
 # Run only Unit tests
-vendor/bin/phpunit --testsuite=Unit
+vendor/bin/pest tests/Unit
 
 # Run only Feature tests
-vendor/bin/phpunit --testsuite=Feature
+vendor/bin/pest tests/Feature
 
-# Run a specific test class
-vendor/bin/phpunit tests/Feature/MultiDriverFullBackupTest.php
+# Run only Integration tests
+vendor/bin/pest tests/Integration
 
-# Filter by test name
-vendor/bin/phpunit --filter=test_scoped_importer_force_fills_guarded_attributes
+# Run a specific test file
+vendor/bin/pest tests/Feature/MultiDriverFullBackupTest.php
+
+# Filter by test name or description
+vendor/bin/pest --filter="force fills guarded attributes"
 ```
 
 ---
@@ -89,8 +95,10 @@ Tests extend `KaziSTM\LaravelScopedBackup\Tests\TestCase`, which:
 
 When contributing a new database driver or feature:
 
-1. **Test Real Behavior Where Practical:** For lightweight engines like SQLite, avoid mocking database connections; test real disk creation, backup, and restore.
-2. **Process Argument Verification:** For drivers relying on external utilities (`pg_dump`, `mysqldump`), verify that credentials are passed exclusively via process environment variables and that dangerous shell strings are never evaluated.
+1. **Author All Tests in Pest:** Every test must be authored using Pest syntax (`it()`, `expect()`, `beforeEach()`, etc.).
+2. **Test Real Behavior Where Practical:** For lightweight engines like SQLite, avoid mocking database connections; test real disk creation, backup, and restore.
+3. **Process Argument Verification:** For drivers relying on external utilities (`pg_dump`, `mysqldump`), verify that credentials are passed exclusively via process environment variables and that dangerous shell strings are never evaluated.
+
 ---
 
 ## Real Database Integration Testing
@@ -100,7 +108,8 @@ The package includes real-instance integration tests for PostgreSQL, MySQL, Mari
 ### 1. Environment Isolation and Safety
 - Integration tests **never** connect to or drop existing developer application databases.
 - Each test generates randomized, uniquely prefixed databases (`test_scoped_pkg_*`) using its administrative connection.
-- Active connections are forcefully terminated before dropping, and cleanup is executed deterministically via `try/finally` blocks and `tearDown()` hooks.
+- Destructive operations enforce strict prefix assertions (`assertSafeTestDatabaseName`) before any drop action.
+- Active connections are forcefully terminated before dropping, and cleanup is executed deterministically via `try/finally` blocks and `afterEach()` hooks.
 - Temporary dump files created during tests are unlinked in `finally` blocks, even when tests assert failure exceptions.
 
 ### 2. CI vs Local Development Behavior
@@ -112,17 +121,17 @@ Configure these variables in your shell or `.env.testing` to enable real databas
 
 | Variable | Default | Purpose |
 | :--- | :--- | :--- |
-| `DB_PGSQL_HOST` | `null` (disabled) | PostgreSQL hostname (e.g. `127.0.0.1`) |
+| `DB_PGSQL_HOST` | `null` (disabled) | PostgreSQL hostname (e.g. `localhost`) |
 | `DB_PGSQL_PORT` | `5432` | PostgreSQL port |
 | `DB_PGSQL_USERNAME` | `postgres` | Administrative username |
 | `DB_PGSQL_PASSWORD` | `""` | Administrative password |
 | `DB_PGSQL_DATABASE` | `postgres` | Administrative database for provisioning |
-| `DB_MYSQL_HOST` | `null` (disabled) | MySQL hostname (e.g. `127.0.0.1`) |
+| `DB_MYSQL_HOST` | `null` (disabled) | MySQL hostname (e.g. `localhost`) |
 | `DB_MYSQL_PORT` | `3306` | MySQL port |
 | `DB_MYSQL_USERNAME` | `root` | Administrative username |
 | `DB_MYSQL_PASSWORD` | `""` | Administrative password |
 | `DB_MYSQL_DATABASE` | `mysql` | Administrative database for provisioning |
-| `DB_MARIADB_HOST` | `null` (disabled) | MariaDB hostname (e.g. `127.0.0.1`) |
+| `DB_MARIADB_HOST` | `null` (disabled) | MariaDB hostname (e.g. `localhost`) |
 | `DB_MARIADB_PORT` | `3307` | MariaDB port |
 | `DB_MARIADB_USERNAME`| `root` | Administrative username |
 | `DB_MARIADB_PASSWORD`| `""` | Administrative password |

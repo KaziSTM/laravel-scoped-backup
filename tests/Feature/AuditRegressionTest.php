@@ -2,8 +2,6 @@
 
 declare(strict_types=1);
 
-namespace KaziSTM\LaravelScopedBackup\Tests\Feature;
-
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\File;
@@ -20,101 +18,95 @@ use KaziSTM\LaravelScopedBackup\Services\ChecksumValidator;
 use KaziSTM\LaravelScopedBackup\Services\ScopedExporter;
 use KaziSTM\LaravelScopedBackup\Services\ScopedImporter;
 use KaziSTM\LaravelScopedBackup\Support\ScopedBackupDefinition;
-use KaziSTM\LaravelScopedBackup\Tests\TestCase;
-use SQLite3;
 
 // Test model with strict guarded attributes
-class GuardedModel extends Model
-{
-    protected $table = 'guarded_models';
+if (! class_exists('GuardedModel')) {
+    class GuardedModel extends Model
+    {
+        protected $table = 'guarded_models';
 
-    protected $guarded = ['*']; // Completely guarded against standard mass assignment
+        protected $guarded = ['*']; // Completely guarded against standard mass assignment
+    }
 }
 
-final class AuditRegressionTest extends TestCase
-{
-    protected function setUp(): void
-    {
-        parent::setUp();
-        Storage::fake('local');
+beforeEach(function (): void {
+    Storage::fake('local');
 
-        if (! Schema::hasTable('guarded_models')) {
-            Schema::create('guarded_models', function (Blueprint $table) {
-                $table->id();
-                $table->string('secret_token');
-                $table->string('role');
-                $table->timestamps();
-            });
-        }
+    if (! Schema::hasTable('guarded_models')) {
+        Schema::create('guarded_models', function (Blueprint $table) {
+            $table->id();
+            $table->string('secret_token');
+            $table->string('role');
+            $table->timestamps();
+        });
     }
+});
 
-    public function test_scoped_importer_force_fills_guarded_attributes(): void
-    {
-        // 1. Create record with guarded attributes
-        $record = new GuardedModel;
-        $record->forceFill([
-            'id' => 42,
-            'secret_token' => 'top_secret_xyz',
-            'role' => 'superadmin',
-        ]);
-        $record->save();
+it('force fills guarded attributes in scoped importer', function (): void {
+    // 1. Create record with guarded attributes
+    $record = new GuardedModel;
+    $record->forceFill([
+        'id' => 42,
+        'secret_token' => 'top_secret_xyz',
+        'role' => 'superadmin',
+    ]);
+    $record->save();
 
-        // 2. Export scoped backup
-        $def = ScopedBackupDefinition::make('guarded_scope')
-            ->model(GuardedModel::class)
-            ->identity('id');
+    // 2. Export scoped backup
+    $def = ScopedBackupDefinition::make('guarded_scope')
+        ->model(GuardedModel::class)
+        ->identity('id');
 
-        $action = app(CreateScopedBackupAction::class);
-        $result = $action->execute($def);
-        $archivePath = Storage::disk('local')->path($result['record']->file_path);
+    $action = app(CreateScopedBackupAction::class);
+    $result = $action->execute($def);
+    $archivePath = Storage::disk('local')->path($result['record']->file_path);
 
-        // 3. Wipe table
-        GuardedModel::truncate();
-        $this->assertSame(0, GuardedModel::count());
+    // 3. Wipe table
+    GuardedModel::truncate();
+    expect(GuardedModel::count())->toBe(0);
 
-        // 4. Restore and verify that guarded attributes were NOT dropped
-        $importer = app(ScopedImporter::class);
-        $stats = $importer->import($archivePath, [
-            'model' => GuardedModel::class,
-            'identity_keys' => ['id'],
-            'mode' => RestoreMode::TRANSACTIONAL_UPSERT,
-        ]);
+    // 4. Restore and verify that guarded attributes were NOT dropped
+    $importer = app(ScopedImporter::class);
+    $stats = $importer->import($archivePath, [
+        'model' => GuardedModel::class,
+        'identity_keys' => ['id'],
+        'mode' => RestoreMode::TRANSACTIONAL_UPSERT,
+    ]);
 
-        $this->assertSame(1, $stats->recordsCreated);
-        $restored = GuardedModel::find(42);
-        $this->assertNotNull($restored, 'Record with ID 42 must be restored');
-        $this->assertSame('top_secret_xyz', $restored->secret_token);
-        $this->assertSame('superadmin', $restored->role);
-    }
+    expect($stats->recordsCreated)->toBe(1);
+    $restored = GuardedModel::find(42);
+    expect($restored)->not->toBeNull('Record with ID 42 must be restored')
+        ->and($restored->secret_token)->toBe('top_secret_xyz')
+        ->and($restored->role)->toBe('superadmin');
+});
 
-    public function test_mariadb_detection_when_connection_driver_is_mysql(): void
-    {
-        config([
-            'database.connections.mariadb_test' => [
-                'driver' => 'mysql',
-                'is_mariadb' => true,
-                'database' => 'test_db',
-            ],
-            'database.connections.standard_mysql' => [
-                'driver' => 'mysql',
-                'database' => 'test_db',
-            ],
-        ]);
+it('detects mariadb when connection driver is mysql', function (): void {
+    config([
+        'database.connections.mariadb_test' => [
+            'driver' => 'mysql',
+            'is_mariadb' => true,
+            'database' => 'test_db',
+        ],
+        'database.connections.standard_mysql' => [
+            'driver' => 'mysql',
+            'database' => 'test_db',
+        ],
+    ]);
 
-        $manager = app(DatabaseBackupDriverManager::class);
+    $manager = app(DatabaseBackupDriverManager::class);
 
-        $mariaDriver = $manager->resolveForConnection('mariadb_test');
-        $this->assertInstanceOf(MariaDbDriver::class, $mariaDriver);
+    $mariaDriver = $manager->resolveForConnection('mariadb_test');
+    expect($mariaDriver)->toBeInstanceOf(MariaDbDriver::class);
 
-        $mySqlDriver = $manager->resolveForConnection('standard_mysql');
-        $this->assertInstanceOf(MySqlDriver::class, $mySqlDriver);
-    }
+    $mySqlDriver = $manager->resolveForConnection('standard_mysql');
+    expect($mySqlDriver)->toBeInstanceOf(MySqlDriver::class);
+});
 
-    public function test_sqlite_restore_isolates_and_cleans_stale_wal_and_shm_files(): void
-    {
-        $tempDir = storage_path('framework/testing/sqlite_wal_test_'.uniqid());
-        File::makeDirectory($tempDir, 0700, true, true);
+it('isolates and cleans stale WAL and SHM files on sqlite restore', function (): void {
+    $tempDir = storage_path('framework/testing/sqlite_wal_test_'.uniqid());
+    File::makeDirectory($tempDir, 0700, true, true);
 
+    try {
         $sourceDb = $tempDir.'/source.sqlite';
         $targetDb = $tempDir.'/target.sqlite';
         $backupArchive = $tempDir.'/backup.sqlite';
@@ -138,58 +130,62 @@ final class AuditRegressionTest extends TestCase
         File::put($targetDb.'-wal', 'stale wal bytes');
         File::put($targetDb.'-shm', 'stale shm bytes');
 
-        $this->assertTrue(File::exists($targetDb.'-wal'));
-        $this->assertTrue(File::exists($targetDb.'-shm'));
+        expect(File::exists($targetDb.'-wal'))->toBeTrue()
+            ->and(File::exists($targetDb.'-shm'))->toBeTrue();
 
         // 4. Restore into target
         $driver->restore(['driver' => 'sqlite', 'database' => $targetDb], $backupArchive);
 
         // 5. Stale WAL and SHM files must have been cleaned up
-        $this->assertFalse(File::exists($targetDb.'-wal'), 'Stale WAL file must be cleaned on restore');
-        $this->assertFalse(File::exists($targetDb.'-shm'), 'Stale SHM file must be cleaned on restore');
+        expect(File::exists($targetDb.'-wal'))->toBeFalse('Stale WAL file must be cleaned on restore')
+            ->and(File::exists($targetDb.'-shm'))->toBeFalse('Stale SHM file must be cleaned on restore');
 
         // 6. Verify restored data
         $vDb = new SQLite3($targetDb);
         $title = $vDb->querySingle('SELECT title FROM items WHERE id = 1;');
         $vDb->close();
 
-        $this->assertSame('Fresh Title', $title);
-
-        File::deleteDirectory($tempDir);
+        expect($title)->toBe('Fresh Title');
+    } finally {
+        if (File::isDirectory($tempDir)) {
+            File::deleteDirectory($tempDir);
+        }
     }
+});
 
-    public function test_checksum_validator_computes_sha256_from_stream(): void
-    {
-        $validator = new ChecksumValidator;
+it('computes sha256 from stream in ChecksumValidator', function (): void {
+    $validator = new ChecksumValidator;
 
-        $content = 'Sample content for streaming checksum verification 123456';
-        $stream = fopen('php://temp', 'r+b');
-        fwrite($stream, $content);
-        rewind($stream);
+    $content = 'Sample content for streaming checksum verification 123456';
+    $stream = fopen('php://temp', 'r+b');
+    fwrite($stream, $content);
+    rewind($stream);
 
-        $hash = $validator->sha256Stream($stream);
-        fclose($stream);
+    $hash = $validator->sha256Stream($stream);
+    fclose($stream);
 
-        $this->assertSame(hash('sha256', $content), $hash);
-    }
+    expect($hash)->toBe(hash('sha256', $content));
+});
 
-    public function test_scoped_exporter_executes_on_model_connection(): void
-    {
-        $validator = new ChecksumValidator;
-        $exporter = new ScopedExporter($validator);
+it('executes scoped exporter on model connection', function (): void {
+    $validator = new ChecksumValidator;
+    $exporter = new ScopedExporter($validator);
 
-        $tempStaging = storage_path('framework/testing/scoped_exporter_staging_'.uniqid());
+    $tempStaging = storage_path('framework/testing/scoped_exporter_staging_'.uniqid());
 
+    try {
         $def = ScopedBackupDefinition::make('exporter_test')
             ->model(GuardedModel::class)
             ->withTransaction(true, 'READ COMMITTED');
 
         $result = $exporter->export($def, $tempStaging);
 
-        $this->assertInstanceOf(BackupStats::class, $result['stats']);
-        $this->assertSame('scoped', $result['manifest']->backupType->value);
-        $this->assertSame(GuardedModel::class, $result['manifest']->metadata['root_model']);
-
-        File::deleteDirectory($tempStaging);
+        expect($result['stats'])->toBeInstanceOf(BackupStats::class)
+            ->and($result['manifest']->backupType->value)->toBe('scoped')
+            ->and($result['manifest']->metadata['root_model'])->toBe(GuardedModel::class);
+    } finally {
+        if (File::isDirectory($tempStaging)) {
+            File::deleteDirectory($tempStaging);
+        }
     }
-}
+});

@@ -121,7 +121,7 @@ my_database_2026-10-14_140000_a1b2c3d4.zip
     "created_at": "2026-10-14T14:00:02+01:00",
     "environment": "production",
     "driver": "pgsql",
-    "database_name": "company_radar",
+    "database_name": "app_production",
     "counts": {
         "toc_entries": 312,
         "files": 45

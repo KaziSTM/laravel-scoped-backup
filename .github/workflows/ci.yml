@@ -115,4 +115,4 @@ jobs:
           DB_MARIADB_USERNAME: root
           DB_MARIADB_PASSWORD: password
           DB_MARIADB_DATABASE: mysql
-        run: vendor/bin/phpunit --colors=always
+        run: vendor/bin/pest --colors=always

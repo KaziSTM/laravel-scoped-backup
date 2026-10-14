@@ -3,7 +3,7 @@
 [![Software License](https://img.shields.io/badge/license-MIT-brightgreen.svg?style=flat-square)](LICENSE.md)
 [![PHP Version](https://img.shields.io/badge/php-%5E8.2%20%7C%20%5E8.3%20%7C%20%5E8.4%20%7C%20%5E8.5-blue.svg?style=flat-square)](docs/compatibility.md)
 [![Laravel Version](https://img.shields.io/badge/laravel-%5E11.0%20%7C%20%5E12.0%20%7C%20%5E13.0-red.svg?style=flat-square)](docs/compatibility.md)
-[![Tests Passing](https://img.shields.io/badge/tests-75%20passed%20(317%20assertions)-success.svg?style=flat-square)](docs/testing.md)
+[![Tests Passing](https://img.shields.io/badge/tests-84%20tests%20(Pest)-success.svg?style=flat-square)](docs/testing.md)
 
 An enterprise-ready Laravel package providing dual backup strategies:
 1. **Full Database & Filesystem Backups:** Native, verified database dumps for PostgreSQL, MySQL, MariaDB, and SQLite, optional application filesystem inclusion, atomic ZIP archive packaging with cryptographic JSON manifests, streaming SHA-256 validation, and audit-preserving retention policies.
@@ -320,17 +320,16 @@ Comprehensive guides and architectural specifications are available in the [`doc
 
 ## Testing
 
-The package includes a comprehensive test suite covering unit tests, feature tests, driver mocks, and audit regression tests:
+The package includes a comprehensive test suite authored in [Pest](https://pestphp.com/) covering unit tests, feature tests, driver mocks, and audit regression tests:
 
 ```bash
-# Run tests using PHPUnit
-vendor/bin/phpunit
-
-# Or via Pest if installed in your environment
+# Run tests using Pest
+composer test
+# or
 vendor/bin/pest
 ```
 
-All 61 tests and 250 assertions run in complete isolation without requiring external database services (using SQLite in-memory fixtures and mocked database drivers).
+Unit and feature tests run in complete isolation without requiring external database services (using SQLite in-memory fixtures and mocked database drivers). Real database integration tests are isolated and configured via environment variables (see [Testing Guide](docs/testing.md)).
 
 ---
 

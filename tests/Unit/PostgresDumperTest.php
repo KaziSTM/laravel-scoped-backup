@@ -2,79 +2,55 @@
 
 declare(strict_types=1);
 
-namespace KaziSTM\LaravelScopedBackup\Tests\Unit;
-
 use Illuminate\Support\Facades\File;
 use KaziSTM\LaravelScopedBackup\Dumpers\PostgresDumper;
 use KaziSTM\LaravelScopedBackup\Exceptions\BackupProcessException;
 use KaziSTM\LaravelScopedBackup\Exceptions\BackupVerificationException;
 use KaziSTM\LaravelScopedBackup\Exceptions\UnsupportedDatabaseDriverException;
-use KaziSTM\LaravelScopedBackup\Tests\TestCase;
 
-final class PostgresDumperTest extends TestCase
-{
-    private string $tempDir;
+beforeEach(function (): void {
+    $this->tempDir = storage_path('framework/testing/pkg_dumper_tests_'.uniqid());
+    File::makeDirectory($this->tempDir, 0755, true, true);
+});
 
-    protected function setUp(): void
-    {
-        parent::setUp();
-        $this->tempDir = storage_path('framework/testing/pkg_dumper_tests_'.uniqid());
-        File::makeDirectory($this->tempDir, 0755, true, true);
+afterEach(function (): void {
+    if (isset($this->tempDir) && File::isDirectory($this->tempDir)) {
+        File::deleteDirectory($this->tempDir);
     }
+});
 
-    protected function tearDown(): void
-    {
-        if (File::isDirectory($this->tempDir)) {
-            File::deleteDirectory($this->tempDir);
-        }
-        parent::tearDown();
-    }
+it('rejects non-pgsql driver on dump', function (): void {
+    $dumper = new PostgresDumper;
 
-    public function test_dump_rejects_non_pgsql_driver(): void
-    {
-        $dumper = new PostgresDumper;
+    expect(fn () => $dumper->dump([
+        'driver' => 'mysql',
+        'database' => 'test_db',
+    ], $this->tempDir.'/out.dump'))
+        ->toThrow(UnsupportedDatabaseDriverException::class, "Database driver [mysql] is not supported for backups. Only PostgreSQL ('pgsql') is supported.");
+});
 
-        $this->expectException(UnsupportedDatabaseDriverException::class);
-        $this->expectExceptionMessage("Database driver [mysql] is not supported for backups. Only PostgreSQL ('pgsql') is supported.");
+it('rejects missing database name on dump', function (): void {
+    $dumper = new PostgresDumper;
 
-        $dumper->dump([
-            'driver' => 'mysql',
-            'database' => 'test_db',
-        ], $this->tempDir.'/out.dump');
-    }
+    expect(fn () => $dumper->dump([
+        'driver' => 'pgsql',
+        'database' => '',
+    ], $this->tempDir.'/out.dump'))
+        ->toThrow(BackupProcessException::class, 'Database name is not configured');
+});
 
-    public function test_dump_rejects_missing_database_name(): void
-    {
-        $dumper = new PostgresDumper;
+it('rejects nonexistent file on verifyArchive', function (): void {
+    $dumper = new PostgresDumper;
 
-        $this->expectException(BackupProcessException::class);
-        $this->expectExceptionMessage('Database name is not configured');
+    expect(fn () => $dumper->verifyArchive($this->tempDir.'/nonexistent.dump'))
+        ->toThrow(BackupVerificationException::class, 'does not exist or is empty');
+});
 
-        $dumper->dump([
-            'driver' => 'pgsql',
-            'database' => '',
-        ], $this->tempDir.'/out.dump');
-    }
+it('rejects empty file on verifyArchive', function (): void {
+    $dumper = new PostgresDumper;
+    $emptyFile = $this->tempDir.'/empty.dump';
+    File::put($emptyFile, '');
 
-    public function test_verify_archive_rejects_nonexistent_file(): void
-    {
-        $dumper = new PostgresDumper;
-
-        $this->expectException(BackupVerificationException::class);
-        $this->expectExceptionMessage('does not exist or is empty');
-
-        $dumper->verifyArchive($this->tempDir.'/nonexistent.dump');
-    }
-
-    public function test_verify_archive_rejects_empty_file(): void
-    {
-        $dumper = new PostgresDumper;
-        $emptyFile = $this->tempDir.'/empty.dump';
-        File::put($emptyFile, '');
-
-        $this->expectException(BackupVerificationException::class);
-        $this->expectExceptionMessage('does not exist or is empty');
-
-        $dumper->verifyArchive($emptyFile);
-    }
-}
+    expect(fn () => $dumper->verifyArchive($emptyFile))
+        ->toThrow(BackupVerificationException::class, 'does not exist or is empty');
+});

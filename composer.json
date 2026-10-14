@@ -41,6 +41,8 @@
     "require-dev": {
         "mockery/mockery": "^1.6",
         "orchestra/testbench": "^9.0|^10.0",
+        "pestphp/pest": "^3.7",
+        "pestphp/pest-plugin-laravel": "^3.1",
         "phpunit/phpunit": "^11.0|^12.0"
     },
     "suggest": {
@@ -67,7 +69,13 @@
     },
     "config": {
         "sort-packages": true,
-        "preferred-install": "dist"
+        "preferred-install": "dist",
+        "allow-plugins": {
+            "pestphp/pest-plugin": true
+        }
+    },
+    "scripts": {
+        "test": "pest"
     },
     "minimum-stability": "dev",
     "prefer-stable": true
