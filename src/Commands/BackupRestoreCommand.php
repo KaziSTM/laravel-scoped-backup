@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace KaziSTM\LaravelScopedBackup\Commands;
 
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Storage;
 use KaziSTM\LaravelScopedBackup\Actions\RestoreFullBackupAction;
 use KaziSTM\LaravelScopedBackup\Actions\RestoreScopedBackupAction;
 use KaziSTM\LaravelScopedBackup\Enums\RestoreMode;
+use KaziSTM\LaravelScopedBackup\Models\BackupRecord;
 use Throwable;
 
 class BackupRestoreCommand extends Command
@@ -79,11 +81,27 @@ class BackupRestoreCommand extends Command
         }
 
         // Scoped Dataset Restore
-        $this->info("Initiating SCOPED dataset restore from [{$target}]".($dryRun ? ' (DRY RUN)' : '').'...');
+        $resolvedPath = $target;
+        if (is_numeric($target)) {
+            $record = BackupRecord::find((int) $target);
+            if (! $record) {
+                $this->error("Backup record with ID [{$target}] not found.");
+
+                return self::FAILURE;
+            }
+            $resolvedPath = Storage::disk($record->disk)->path($record->file_path);
+        } elseif (! file_exists($target)) {
+            $configuredDisk = (string) config('scoped-backup.storage.disk', 'local');
+            if (Storage::disk($configuredDisk)->exists($target)) {
+                $resolvedPath = Storage::disk($configuredDisk)->path($target);
+            }
+        }
+
+        $this->info("Initiating SCOPED dataset restore from [{$resolvedPath}]".($dryRun ? ' (DRY RUN)' : '').'...');
 
         try {
             $stats = $restoreScoped->execute(
-                archivePath: $target,
+                archivePath: $resolvedPath,
                 options: [
                     'connection' => $connection,
                     'dry_run' => $dryRun,
