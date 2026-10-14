@@ -6,7 +6,7 @@ permissions:
 on:
   push:
     tags:
-      - release/v*
+      - 'v*'
 
 jobs:
   release:
@@ -22,36 +22,35 @@ jobs:
         id: tag
         run: |
           RELEASE_TAG="${GITHUB_REF_NAME}"
-          VERSION_TAG="${RELEASE_TAG#release/}"
-
-          echo "release=$RELEASE_TAG" >> $GITHUB_OUTPUT
-          echo "version=$VERSION_TAG" >> $GITHUB_OUTPUT
+          echo "tag=$RELEASE_TAG" >> "$GITHUB_OUTPUT"
+          echo "version=$RELEASE_TAG" >> "$GITHUB_OUTPUT"
 
       - name: 📝 Generate changelog
         id: changelog
+        env:
+          CURRENT: ${{ steps.tag.outputs.tag }}
         run: |
           git fetch --tags
+          PREVIOUS=$(git tag --list 'v*' --sort=-v:refname | grep -Fxv "$CURRENT" | head -n1 || true)
+          if [ -n "$PREVIOUS" ]; then
+            RANGE="$PREVIOUS..$CURRENT"
+          else
+            RANGE="$CURRENT"
+          fi
 
-          CURRENT="${{ steps.tag.outputs.version }}"
-          PREVIOUS=$(git describe --tags --abbrev=0 "$CURRENT^" 2>/dev/null || true)
+          LOG=$(git log "$RANGE" --no-merges --pretty=format:"- %s (%an)")
+          [ -z "$LOG" ] && LOG="- Release $CURRENT"
 
-          RANGE=${PREVIOUS:+$PREVIOUS..}$CURRENT
-
-          LOG=$(git log "$RANGE" \
-            --no-merges \
-            --pretty=format:"- %s (%an)")
-
-          [ -z "$LOG" ] && LOG="- No user-facing changes"
-
-          echo "previous=$PREVIOUS" >> $GITHUB_OUTPUT
-          echo "summary<<EOF" >> $GITHUB_OUTPUT
-          echo "$LOG" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+          EOF_DELIM=$(openssl rand -hex 16)
+          echo "previous=${PREVIOUS:-N/A}" >> "$GITHUB_OUTPUT"
+          echo "summary<<$EOF_DELIM" >> "$GITHUB_OUTPUT"
+          echo "$LOG" >> "$GITHUB_OUTPUT"
+          echo "$EOF_DELIM" >> "$GITHUB_OUTPUT"
 
       - name: 📦 Create GitHub Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.tag.outputs.version }}
+          tag_name: ${{ steps.tag.outputs.tag }}
           name: ${{ steps.tag.outputs.version }}
           body: |
             ## 🚀 Release ${{ steps.tag.outputs.version }}
@@ -63,22 +62,29 @@ jobs:
 
       - name: 📣 Notify Discord (release)
         continue-on-error: true
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          REPO: ${{ github.repository }}
+          VERSION: ${{ steps.tag.outputs.version }}
+          PREVIOUS: ${{ steps.changelog.outputs.previous }}
+          RELEASE_URL: ${{ github.server_url }}/${{ github.repository }}/releases/tag/${{ steps.tag.outputs.tag }}
+          CHANGELOG: ${{ steps.changelog.outputs.summary }}
         run: |
-          MESSAGE=$(cat <<EOF
-          🚀 **Release ${{ steps.tag.outputs.version }} published**
+          if [ -z "$DISCORD_WEBHOOK_URL" ]; then
+            echo "DISCORD_WEBHOOK_URL not configured; skipping notification."
+            exit 0
+          fi
 
-          📦 **Repository:** \`${{ github.repository }}\`
-          ⬅️ **Previous:** \`${{ steps.changelog.outputs.previous || 'N/A' }}\`
+          PAYLOAD=$(jq -n \
+            --arg repo "$REPO" \
+            --arg version "$VERSION" \
+            --arg previous "$PREVIOUS" \
+            --arg url "$RELEASE_URL" \
+            --arg changelog "$CHANGELOG" \
+            '{
+              content: ("🚀 **Release " + $version + " published**\n\n📦 **Repository:** `" + $repo + "`\n⬅️ **Previous:** `" + $previous + "`\n\n📝 **Changes**\n" + $changelog + "\n\n🔗 " + $url)
+            }')
 
-          📝 **Changes**
-          ${{ steps.changelog.outputs.summary }}
-
-          🔗 ${{ github.server_url }}/${{ github.repository }}/releases/tag/${{ steps.tag.outputs.version }}
-          EOF
-          )
-
-          SAFE=$(echo "$MESSAGE" | head -c 1900 | jq -Rs .)
-
-          curl -X POST "${{ secrets.DISCORD_WEBHOOK_URL }}" \
+          curl -fsS -X POST "$DISCORD_WEBHOOK_URL" \
             -H "Content-Type: application/json" \
-            -d "{\"content\": $SAFE}"
+            -d "$PAYLOAD" || true

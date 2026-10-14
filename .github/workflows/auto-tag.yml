@@ -7,6 +7,7 @@ on:
   workflow_run:
     workflows: ["CI"]
     types: [completed]
+    branches: [main]
 
 jobs:
   tag:
@@ -32,100 +33,156 @@ jobs:
         id: semver
         run: |
           git fetch --tags
+          python3 - << 'EOF' "$GITHUB_OUTPUT"
+          import sys, re, subprocess
 
-          LAST=$(git tag --list 'v*' --sort=-v:refname | head -n1 | sed 's/^v//')
-          LAST=${LAST:-0.0.0}
+          output_file = sys.argv[1]
 
-          MAJOR=${LAST%%.*}
-          REST=${LAST#*.}
-          MINOR=${REST%%.*}
-          PATCH=${REST##*.}
+          # Check if current commit is already tagged
+          tags_at_head = subprocess.run(
+              ["git", "tag", "--points-at", "HEAD"],
+              capture_output=True, text=True, check=True
+          ).stdout.strip().split()
 
-          # Detect merge commit
-          if git log -1 --pretty=%B | grep -q "^Merge pull request"; then
-            echo "Merge commit detected"
+          if tags_at_head:
+              print(f"Commit is already tagged ({tags_at_head[0]}); skipping release.")
+              with open(output_file, "a") as f:
+                  f.write("released=false\n")
+              sys.exit(0)
 
-            # Get commits introduced by the merge
-            MSG=$(git log -1 --no-merges --pretty=%s)
+          # Extract commit subject and body
+          subject = subprocess.run(
+              ["git", "log", "-1", "--pretty=format:%s"],
+              capture_output=True, text=True, check=True
+          ).stdout.strip()
 
-            echo "Using merged commit message: $MSG"
-          else
-            MSG=$(git log -1 --pretty=%s)
-            echo "Using direct commit message: $MSG"
-          fi
+          body = subprocess.run(
+              ["git", "log", "-1", "--pretty=format:%b"],
+              capture_output=True, text=True, check=True
+          ).stdout
 
-          if [[ "$MSG" == *"!"* ]]; then
-            MAJOR=$((MAJOR+1)); MINOR=0; PATCH=0
-          elif [[ "$MSG" == feat* ]]; then
-            MINOR=$((MINOR+1)); PATCH=0
-          elif [[ "$MSG" == fix* ]]; then
-            PATCH=$((PATCH+1))
-          else
-            echo "released=false" >> $GITHUB_OUTPUT
-            exit 0
-          fi
+          # Handle merge commits
+          if subject.startswith("Merge pull request"):
+              subject = subprocess.run(
+                  ["git", "log", "-1", "--no-merges", "--pretty=format:%s"],
+                  capture_output=True, text=True, check=True
+              ).stdout.strip()
 
-          echo "version=v$MAJOR.$MINOR.$PATCH" >> $GITHUB_OUTPUT
-          echo "released=true" >> $GITHUB_OUTPUT
+          # Conventional commit evaluation
+          is_breaking = False
+          if re.search(r"^[a-zA-Z]+(\([^)]+\))?!:", subject):
+              is_breaking = True
+          elif re.search(r"^(BREAKING CHANGE|BREAKING-CHANGE):", body, re.MULTILINE):
+              is_breaking = True
+
+          bump = None
+          if is_breaking:
+              bump = "major"
+          elif re.search(r"^feat(\([^)]+\))?:", subject):
+              bump = "minor"
+          elif re.search(r"^fix(\([^)]+\))?:", subject):
+              bump = "patch"
+
+          if not bump:
+              print(f"Commit '{subject}' does not trigger a release (not feat, fix, or breaking).")
+              with open(output_file, "a") as f:
+                  f.write("released=false\n")
+              sys.exit(0)
+
+          # Retrieve latest semver tag
+          tag_proc = subprocess.run(
+              ["git", "tag", "--list", "v*", "--sort=-v:refname"],
+              capture_output=True, text=True, check=True
+          )
+          tags = [t.strip() for t in tag_proc.stdout.splitlines() if t.strip()]
+
+          if tags:
+              latest = tags[0].lstrip("v")
+              parts = latest.split(".")
+              major = int(parts[0]) if len(parts) > 0 else 0
+              minor = int(parts[1]) if len(parts) > 1 else 0
+              patch = int(parts[2]) if len(parts) > 2 else 0
+          else:
+              major, minor, patch = 0, 0, 0
+
+          if bump == "major":
+              major += 1
+              minor = 0
+              patch = 0
+          elif bump == "minor":
+              minor += 1
+              patch = 0
+          elif bump == "patch":
+              patch += 1
+
+          next_version = f"v{major}.{minor}.{patch}"
+          print(f"Determined next version: {next_version} (bump: {bump})")
+
+          with open(output_file, "a") as f:
+              f.write(f"version={next_version}\n")
+              f.write("released=true\n")
+          EOF
 
       - name: 🏷️ Create version tag
         if: steps.semver.outputs.released == 'true'
+        env:
+          TAG_VERSION: ${{ steps.semver.outputs.version }}
         run: |
-          git tag "${{ steps.semver.outputs.version }}"
-          git push origin "${{ steps.semver.outputs.version }}"
+          git tag "$TAG_VERSION"
+          git push origin "$TAG_VERSION"
 
       - name: 📝 Generate changelog
         id: changelog
         if: steps.semver.outputs.released == 'true'
+        env:
+          CURRENT: ${{ steps.semver.outputs.version }}
         run: |
-          CURRENT="${{ steps.semver.outputs.version }}"
-          PREVIOUS=$(git describe --tags --abbrev=0 "$CURRENT^" 2>/dev/null || true)
+          PREVIOUS=$(git tag --list 'v*' --sort=-v:refname | grep -Fxv "$CURRENT" | head -n1 || true)
+          if [ -n "$PREVIOUS" ]; then
+            RANGE="$PREVIOUS..$CURRENT"
+          else
+            RANGE="$CURRENT"
+          fi
 
-          RANGE=${PREVIOUS:+$PREVIOUS..}$CURRENT
-
-          LOG=$(git log "$RANGE" \
-            --no-merges \
-            --pretty=format:"- %s (%an)")
-
+          LOG=$(git log "$RANGE" --no-merges --pretty=format:"- %s (%an)")
           [ -z "$LOG" ] && LOG="- No user-facing changes"
 
-          echo "previous=$PREVIOUS" >> $GITHUB_OUTPUT
-          echo "summary<<EOF" >> $GITHUB_OUTPUT
-          echo "$LOG" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+          EOF_DELIM=$(openssl rand -hex 16)
+          echo "previous=${PREVIOUS:-N/A}" >> "$GITHUB_OUTPUT"
+          echo "summary<<$EOF_DELIM" >> "$GITHUB_OUTPUT"
+          echo "$LOG" >> "$GITHUB_OUTPUT"
+          echo "$EOF_DELIM" >> "$GITHUB_OUTPUT"
 
       - name: 📣 Notify Discord (version tagged)
         if: steps.semver.outputs.released == 'true'
         continue-on-error: true
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          REPO: ${{ github.repository }}
+          BRANCH: ${{ github.event.workflow_run.head_branch }}
+          VERSION: ${{ steps.semver.outputs.version }}
+          PREVIOUS: ${{ steps.changelog.outputs.previous }}
+          ACTOR: ${{ github.actor }}
+          WORKFLOW_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          CHANGELOG: ${{ steps.changelog.outputs.summary }}
         run: |
-          REPO_NAME="laravel-scoped-backup"
-          REPO="${{ github.repository }}"
-          BRANCH="main"
-          VERSION="${{ steps.semver.outputs.version }}"
-          PREVIOUS="${{ steps.changelog.outputs.previous }}"
-          ACTOR="${{ github.actor }}"
-          WORKFLOW_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-          CHANGELOG="${{ steps.changelog.outputs.summary }}"
+          if [ -z "$DISCORD_WEBHOOK_URL" ]; then
+            echo "DISCORD_WEBHOOK_URL not configured; skipping notification."
+            exit 0
+          fi
 
-          MESSAGE=$(cat <<EOF
-          🚀 **PRODUCTION — ${REPO_NAME}**
+          PAYLOAD=$(jq -n \
+            --arg repo "$REPO" \
+            --arg branch "$BRANCH" \
+            --arg version "$VERSION" \
+            --arg previous "$PREVIOUS" \
+            --arg actor "$ACTOR" \
+            --arg url "$WORKFLOW_URL" \
+            --arg changelog "$CHANGELOG" \
+            '{
+              content: ("🚀 **PRODUCTION — Laravel Scoped Backup**\n\n📦 **Repository:** `" + $repo + "`\n🌿 **Branch:** `" + $branch + "`\n🏷️ **Current Tag:** **" + $version + "**\n⬅️ **Previous Tag:** `" + $previous + "`\n👤 **Triggered by:** `" + $actor + "`\n\n📝 **Changes since last release**\n" + $changelog + "\n\n🔗 **Workflow:** " + $url)
+            }')
 
-          📦 **Repository:** \`${REPO}\`
-          🌿 **Branch:** \`${BRANCH}\`
-          🏷️ **Current Tag:** **${VERSION}**
-          ⬅️ **Previous Tag:** \`${PREVIOUS:-N/A}\`
-          👤 **Triggered by:** \`${ACTOR}\`
-
-          📝 **Changes since last release**
-          ${CHANGELOG}
-
-          🔗 **Workflow**
-          ${WORKFLOW_URL}
-          EOF
-          )
-
-          SAFE=$(echo "$MESSAGE" | head -c 1900 | jq -Rs .)
-
-          curl -X POST "${{ secrets.DISCORD_WEBHOOK_URL }}" \
+          curl -fsS -X POST "$DISCORD_WEBHOOK_URL" \
             -H "Content-Type: application/json" \
-            -d "{\"content\": $SAFE}"
+            -d "$PAYLOAD" || true

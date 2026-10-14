@@ -1,10 +1,13 @@
 name: Commit Lint
 
+permissions:
+  contents: read
+
 on:
   pull_request:
     branches: [main]
   push:
-    branches: [dev]
+    branches: [main, dev, develop]
 
 jobs:
   commitlint:
@@ -23,8 +26,14 @@ jobs:
         run: npm install --no-save @commitlint/{config-conventional,cli}
 
       - name: Lint commits
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
         run: |
-          npx commitlint \
-            --from origin/main \
-            --to HEAD \
-            --verbose
+          git fetch origin main:refs/remotes/origin/main --depth=50 || true
+          if [ "$EVENT_NAME" = "pull_request" ] && [ -n "$BASE_REF" ]; then
+            git fetch origin "$BASE_REF":refs/remotes/origin/"$BASE_REF" --depth=50 || true
+            npx commitlint --from "origin/$BASE_REF" --to HEAD --verbose
+          else
+            npx commitlint --from HEAD~1 --to HEAD --verbose || npx commitlint --last --verbose
+          fi
