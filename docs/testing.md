@@ -18,15 +18,23 @@ tests/
 │   ├── MySqlDriverTest.php              # MySQL process argument construction and verification
 │   ├── PostgresDumperTest.php           # PostgreSQL dump argument and TOC validation
 │   └── SqliteDriverTest.php             # Native SQLite3 online backup API and integrity checks
-└── Feature/
-    ├── AuditRegressionTest.php          # Regression tests for guarded attributes, WAL isolation, etc.
-    ├── CommandsTest.php                 # Artisan CLI command execution and exit code assertions
-    ├── FullBackupTest.php               # Full backup action, manifest creation, and S3 uploading
-    ├── HealthMonitoringTest.php         # Freshness TTL, size anomaly, and checksum checks
-    ├── MultiDriverFullBackupTest.php    # Real SQLite end-to-end full backup and restore
-    ├── NotificationTest.php             # Discord webhook and email dispatch assertions
-    ├── ScopedBackupTest.php             # Scoped dataset export, chunking, and JSONL creation
-    └── ScopedRestoreTest.php            # Scoped dataset upsert and dry-run assertions
+├── Feature/
+│   ├── AuditRegressionTest.php          # Regression tests for guarded attributes, WAL isolation, etc.
+│   ├── CommandsTest.php                 # Artisan CLI command execution and exit code assertions
+│   ├── FullBackupTest.php               # Full backup action, manifest creation, and S3 uploading
+│   ├── HealthMonitoringTest.php         # Freshness TTL, size anomaly, and checksum checks
+│   ├── MultiDriverFullBackupTest.php    # Real SQLite end-to-end full backup and restore
+│   ├── NotificationTest.php             # Discord webhook and email dispatch assertions
+│   ├── ScopedBackupTest.php             # Scoped dataset export, chunking, and JSONL creation
+│   └── ScopedRestoreTest.php            # Scoped dataset upsert and dry-run assertions
+└── Integration/
+    ├── Concerns/
+    │   └── InteractsWithRealDatabases.php # CI detection and failure/skip handling
+    ├── MariaDbRealDriverIntegrationTest.php # Real MariaDB dump, archive verification, and restore
+    ├── MySqlRealDriverIntegrationTest.php   # Real MySQL dump, archive verification, and restore
+    ├── PostgreSqlRealDriverIntegrationTest.php # Real PostgreSQL custom dump and restore
+    ├── RealDatabaseIntegrationTest.php      # Environment binary and version handshake tests
+    └── SqliteWalRealDriverIntegrationTest.php  # Real SQLite WAL concurrency and rollback tests
 ```
 
 ---
@@ -83,4 +91,39 @@ When contributing a new database driver or feature:
 
 1. **Test Real Behavior Where Practical:** For lightweight engines like SQLite, avoid mocking database connections; test real disk creation, backup, and restore.
 2. **Process Argument Verification:** For drivers relying on external utilities (`pg_dump`, `mysqldump`), verify that credentials are passed exclusively via process environment variables and that dangerous shell strings are never evaluated.
-3. **Failure Paths:** Always write tests asserting that missing files, non-zero process exit codes, and corrupted archives throw the expected typed exceptions (`BackupProcessException`, `BackupVerificationException`, `RestoreException`).
+---
+
+## Real Database Integration Testing
+
+The package includes real-instance integration tests for PostgreSQL, MySQL, MariaDB, and SQLite (WAL).
+
+### 1. Environment Isolation and Safety
+- Integration tests **never** connect to or drop existing developer application databases.
+- Each test generates randomized, uniquely prefixed databases (`test_scoped_pkg_*`) using its administrative connection.
+- Active connections are forcefully terminated before dropping, and cleanup is executed deterministically via `try/finally` blocks and `tearDown()` hooks.
+- Temporary dump files created during tests are unlinked in `finally` blocks, even when tests assert failure exceptions.
+
+### 2. CI vs Local Development Behavior
+- **Local Development**: If `DB_*_HOST` is not configured or the target database service is unreachable, tests skip gracefully with an informative message.
+- **Continuous Integration (CI)**: When `CI=true` is detected, tests require the configured database services to be healthy and reachable. If a service connection fails, the test fails immediately rather than skipping silently.
+
+### 3. Environment Variables
+Configure these variables in your shell or `.env.testing` to enable real database testing locally:
+
+| Variable | Default | Purpose |
+| :--- | :--- | :--- |
+| `DB_PGSQL_HOST` | `null` (disabled) | PostgreSQL hostname (e.g. `127.0.0.1`) |
+| `DB_PGSQL_PORT` | `5432` | PostgreSQL port |
+| `DB_PGSQL_USERNAME` | `postgres` | Administrative username |
+| `DB_PGSQL_PASSWORD` | `""` | Administrative password |
+| `DB_PGSQL_DATABASE` | `postgres` | Administrative database for provisioning |
+| `DB_MYSQL_HOST` | `null` (disabled) | MySQL hostname (e.g. `127.0.0.1`) |
+| `DB_MYSQL_PORT` | `3306` | MySQL port |
+| `DB_MYSQL_USERNAME` | `root` | Administrative username |
+| `DB_MYSQL_PASSWORD` | `""` | Administrative password |
+| `DB_MYSQL_DATABASE` | `mysql` | Administrative database for provisioning |
+| `DB_MARIADB_HOST` | `null` (disabled) | MariaDB hostname (e.g. `127.0.0.1`) |
+| `DB_MARIADB_PORT` | `3307` | MariaDB port |
+| `DB_MARIADB_USERNAME`| `root` | Administrative username |
+| `DB_MARIADB_PASSWORD`| `""` | Administrative password |
+| `DB_MARIADB_DATABASE`| `mysql` | Administrative database for provisioning |

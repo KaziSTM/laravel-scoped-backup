@@ -19,5 +19,26 @@
         <env name="APP_ENV" value="testing"/>
         <env name="APP_KEY" value="base64:yk3VUJyVo5pVOmt0iGY2Zoh4dhVO2bpNu7amJk1k5xY="/>
         <env name="DB_CONNECTION" value="testing"/>
+
+        <!-- Real Database Integration Test Configuration (Optional for local dev, auto-skipped when unconfigured; configured in CI) -->
+        <!--
+        <env name="DB_PGSQL_HOST" value="127.0.0.1"/>
+        <env name="DB_PGSQL_PORT" value="5432"/>
+        <env name="DB_PGSQL_USERNAME" value="postgres"/>
+        <env name="DB_PGSQL_PASSWORD" value="password"/>
+        <env name="DB_PGSQL_DATABASE" value="postgres"/>
+
+        <env name="DB_MYSQL_HOST" value="127.0.0.1"/>
+        <env name="DB_MYSQL_PORT" value="3306"/>
+        <env name="DB_MYSQL_USERNAME" value="root"/>
+        <env name="DB_MYSQL_PASSWORD" value="password"/>
+        <env name="DB_MYSQL_DATABASE" value="mysql"/>
+
+        <env name="DB_MARIADB_HOST" value="127.0.0.1"/>
+        <env name="DB_MARIADB_PORT" value="3307"/>
+        <env name="DB_MARIADB_USERNAME" value="root"/>
+        <env name="DB_MARIADB_PASSWORD" value="password"/>
+        <env name="DB_MARIADB_DATABASE" value="mysql"/>
+        -->
     </php>
 </phpunit>

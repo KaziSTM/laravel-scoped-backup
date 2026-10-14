@@ -29,6 +29,7 @@ Contributions are welcome! This document outlines guidelines for contributing to
    ```bash
    vendor/bin/phpunit
    ```
+   *Note*: Unit and Feature tests execute using in-memory SQLite without requiring external databases. To run real database integration tests locally, set the corresponding `DB_*_HOST` variables in your environment (see [Testing Guide](testing.md)).
 6. Commit with clear, descriptive commit messages.
 
 ---

@@ -4,74 +4,116 @@ declare(strict_types=1);
 
 namespace KaziSTM\LaravelScopedBackup\Tests\Integration;
 
+use KaziSTM\LaravelScopedBackup\Database\Drivers\MariaDbDriver;
+use KaziSTM\LaravelScopedBackup\Database\Drivers\MySqlDriver;
+use KaziSTM\LaravelScopedBackup\Database\Drivers\PostgreSqlDriver;
+use KaziSTM\LaravelScopedBackup\Database\Drivers\SqliteDriver;
+use KaziSTM\LaravelScopedBackup\Tests\Integration\Concerns\InteractsWithRealDatabases;
 use KaziSTM\LaravelScopedBackup\Tests\TestCase;
 use PDO;
 use Throwable;
 
 class RealDatabaseIntegrationTest extends TestCase
 {
-    public function test_check_database_connectivity_and_binaries(): void
+    use InteractsWithRealDatabases;
+
+    public function test_sqlite_environment_and_driver_availability(): void
     {
-        // Check binaries available in container
-        $binaries = [
-            'pg_dump' => exec('which pg_dump 2>/dev/null'),
-            'pg_restore' => exec('which pg_restore 2>/dev/null'),
-            'psql' => exec('which psql 2>/dev/null'),
-            'mysqldump' => exec('which mysqldump 2>/dev/null'),
-            'mysql' => exec('which mysql 2>/dev/null'),
-            'mariadb-dump' => exec('which mariadb-dump 2>/dev/null'),
-            'mariadb' => exec('which mariadb 2>/dev/null'),
-            'sqlite3' => exec('which sqlite3 2>/dev/null'),
-        ];
+        $this->assertTrue(extension_loaded('pdo_sqlite'), 'PDO SQLite extension must be loaded.');
 
-        echo "\n[CONTAINER BINARIES DETECTED]:\n".json_encode($binaries, JSON_PRETTY_PRINT)."\n";
+        $driver = new SqliteDriver;
+        $avail = $driver->checkAvailability();
+        $this->assertTrue($avail['available'], 'SQLite driver must be available.');
+        $this->assertNotEmpty($avail['version']);
+    }
 
-        // Check PostgreSQL connectivity
-        $pgHosts = array_values(array_unique(array_filter([env('DB_PGSQL_HOST'), 'lerd-postgres', '127.0.0.1', 'localhost'])));
-        $pgUser = (string) env('DB_PGSQL_USERNAME', 'postgres');
-        $pgPass = (string) env('DB_PGSQL_PASSWORD', 'lerd');
-        $pgPort = (int) env('DB_PGSQL_PORT', 5432);
-        $pgConnected = false;
-        $pgError = null;
-        foreach ($pgHosts as $host) {
-            try {
-                $dsn = "pgsql:host={$host};port={$pgPort};dbname=lerd;user={$pgUser};password={$pgPass}";
-                $pdo = new PDO($dsn, $pgUser, $pgPass, [PDO::ATTR_TIMEOUT => 2]);
-                $version = $pdo->query('SELECT version()')->fetchColumn();
-                echo "\n[POSTGRES CONNECTED via {$host}]: {$version}\n";
-                $pgConnected = true;
-                break;
-            } catch (Throwable $e) {
-                $pgError = $e->getMessage();
-            }
-        }
-        if (! $pgConnected) {
-            echo "\n[POSTGRES CONNECTION FAILED]: {$pgError}\n";
+    public function test_postgresql_environment_connectivity_and_version(): void
+    {
+        $host = env('DB_PGSQL_HOST');
+        $port = (int) (env('DB_PGSQL_PORT') ?: 5432);
+        $username = (string) (env('DB_PGSQL_USERNAME') ?: 'postgres');
+        $password = env('DB_PGSQL_PASSWORD') !== null ? (string) env('DB_PGSQL_PASSWORD') : '';
+        $adminDb = (string) (env('DB_PGSQL_DATABASE') ?: 'postgres');
+
+        if (empty($host)) {
+            $this->handleServiceUnavailable('pgsql', null, $port);
+            return;
         }
 
-        // Check MySQL connectivity
-        $mysqlHosts = array_values(array_unique(array_filter([env('DB_MYSQL_HOST'), 'lerd-mysql', '127.0.0.1', 'localhost'])));
-        $mysqlUser = (string) env('DB_MYSQL_USERNAME', 'root');
-        $mysqlPass = (string) env('DB_MYSQL_PASSWORD', 'lerd');
-        $mysqlPort = (int) env('DB_MYSQL_PORT', 3306);
-        $mysqlConnected = false;
-        $mysqlError = null;
-        foreach ($mysqlHosts as $host) {
-            try {
-                $dsn = "mysql:host={$host};port={$mysqlPort};dbname=lerd";
-                $pdo = new PDO($dsn, $mysqlUser, $mysqlPass, [PDO::ATTR_TIMEOUT => 2]);
-                $version = $pdo->query('SELECT version()')->fetchColumn();
-                echo "\n[MYSQL CONNECTED via {$host}]: {$version}\n";
-                $mysqlConnected = true;
-                break;
-            } catch (Throwable $e) {
-                $mysqlError = $e->getMessage();
-            }
+        $this->assertTrue(extension_loaded('pdo_pgsql'), 'PDO PostgreSQL extension must be loaded when DB_PGSQL_HOST is set.');
+
+        $driver = new PostgreSqlDriver;
+        $avail = $driver->checkAvailability();
+        $this->assertTrue($avail['available'], 'PostgreSQL client binary (pg_dump) must be installed and executable: '.($avail['message'] ?? ''));
+
+        try {
+            $dsn = "pgsql:host={$host};port={$port};dbname={$adminDb};user={$username};password={$password}";
+            $pdo = new PDO($dsn, $username, $password, [PDO::ATTR_TIMEOUT => 3, PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
+            $version = (string) $pdo->query('SELECT version()')->fetchColumn();
+
+            $this->assertStringContainsString('PostgreSQL', $version, "PostgreSQL server at {$host}:{$port} must identify as PostgreSQL.");
+        } catch (Throwable $e) {
+            $this->handleServiceUnavailable('pgsql', $host, $port, $e);
         }
-        if (! $mysqlConnected) {
-            echo "\n[MYSQL CONNECTION FAILED]: {$mysqlError}\n";
+    }
+
+    public function test_mysql_environment_connectivity_and_version(): void
+    {
+        $host = env('DB_MYSQL_HOST');
+        $port = (int) (env('DB_MYSQL_PORT') ?: 3306);
+        $username = (string) (env('DB_MYSQL_USERNAME') ?: 'root');
+        $password = env('DB_MYSQL_PASSWORD') !== null ? (string) env('DB_MYSQL_PASSWORD') : '';
+        $adminDb = (string) (env('DB_MYSQL_DATABASE') ?: 'mysql');
+
+        if (empty($host)) {
+            $this->handleServiceUnavailable('mysql', null, $port);
+            return;
         }
 
-        $this->assertTrue(true);
+        $this->assertTrue(extension_loaded('pdo_mysql'), 'PDO MySQL extension must be loaded when DB_MYSQL_HOST is set.');
+
+        $driver = new MySqlDriver;
+        $avail = $driver->checkAvailability();
+        $this->assertTrue($avail['available'], 'MySQL client binary (mysqldump) must be installed and executable: '.($avail['message'] ?? ''));
+
+        try {
+            $dsn = "mysql:host={$host};port={$port};dbname={$adminDb}";
+            $pdo = new PDO($dsn, $username, $password, [PDO::ATTR_TIMEOUT => 3, PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
+            $version = (string) $pdo->query('SELECT version()')->fetchColumn();
+
+            $this->assertNotEmpty($version, "MySQL server at {$host}:{$port} must return a valid version string.");
+        } catch (Throwable $e) {
+            $this->handleServiceUnavailable('mysql', $host, $port, $e);
+        }
+    }
+
+    public function test_mariadb_environment_connectivity_and_version(): void
+    {
+        $host = env('DB_MARIADB_HOST');
+        $port = (int) (env('DB_MARIADB_PORT') ?: 3307);
+        $username = (string) (env('DB_MARIADB_USERNAME') ?: 'root');
+        $password = env('DB_MARIADB_PASSWORD') !== null ? (string) env('DB_MARIADB_PASSWORD') : '';
+        $adminDb = (string) (env('DB_MARIADB_DATABASE') ?: 'mysql');
+
+        if (empty($host)) {
+            $this->handleServiceUnavailable('mariadb', null, $port);
+            return;
+        }
+
+        $this->assertTrue(extension_loaded('pdo_mysql'), 'PDO MySQL extension must be loaded when DB_MARIADB_HOST is set.');
+
+        $driver = new MariaDbDriver;
+        $avail = $driver->checkAvailability();
+        $this->assertTrue($avail['available'], 'MariaDB/MySQL client binary must be installed and executable: '.($avail['message'] ?? ''));
+
+        try {
+            $dsn = "mysql:host={$host};port={$port};dbname={$adminDb}";
+            $pdo = new PDO($dsn, $username, $password, [PDO::ATTR_TIMEOUT => 3, PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
+            $version = (string) $pdo->query('SELECT version()')->fetchColumn();
+
+            $this->assertStringContainsString('MariaDB', $version, "MariaDB server at {$host}:{$port} must identify as MariaDB.");
+        } catch (Throwable $e) {
+            $this->handleServiceUnavailable('mariadb', $host, $port, $e);
+        }
     }
 }
