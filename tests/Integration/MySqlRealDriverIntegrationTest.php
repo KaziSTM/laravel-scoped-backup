@@ -24,10 +24,10 @@ class MySqlRealDriverIntegrationTest extends TestCase
     {
         parent::setUp();
 
-        $host = 'lerd-mysql';
-        $port = 3306;
-        $username = 'root';
-        $password = 'lerd';
+        $host = env('DB_MYSQL_HOST', 'lerd-mysql');
+        $port = (int) env('DB_MYSQL_PORT', 3306);
+        $username = env('DB_MYSQL_USERNAME', 'root');
+        $password = env('DB_MYSQL_PASSWORD', 'lerd');
 
         try {
             $this->adminPdo = new PDO(

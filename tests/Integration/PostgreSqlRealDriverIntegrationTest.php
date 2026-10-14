@@ -24,10 +24,10 @@ class PostgreSqlRealDriverIntegrationTest extends TestCase
     {
         parent::setUp();
 
-        $host = 'lerd-postgres';
-        $port = 5432;
-        $username = 'postgres';
-        $password = 'lerd';
+        $host = env('DB_PGSQL_HOST', 'lerd-postgres');
+        $port = (int) env('DB_PGSQL_PORT', 5432);
+        $username = env('DB_PGSQL_USERNAME', 'postgres');
+        $password = env('DB_PGSQL_PASSWORD', 'lerd');
 
         try {
             $this->adminPdo = new PDO(

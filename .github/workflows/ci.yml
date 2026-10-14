@@ -72,7 +72,10 @@ jobs:
       - name: 🛠️ Install database client utilities
         run: |
           sudo apt-get update
-          sudo apt-get install -y postgresql-client mysql-client mariadb-client
+          sudo apt-get install -y postgresql-client
+          which mysqldump >/dev/null 2>&1 || sudo apt-get install -y mysql-client
+          sudo ln -sf "$(which mysqldump)" /usr/local/bin/mariadb-dump
+          sudo ln -sf "$(which mysql)" /usr/local/bin/mariadb
 
       - name: 📦 Get Composer cache directory
         id: composer-cache

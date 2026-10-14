@@ -27,13 +27,16 @@ class RealDatabaseIntegrationTest extends TestCase
         echo "\n[CONTAINER BINARIES DETECTED]:\n".json_encode($binaries, JSON_PRETTY_PRINT)."\n";
 
         // Check PostgreSQL connectivity
-        $pgHosts = ['lerd-postgres', '127.0.0.1', 'localhost'];
+        $pgHosts = array_values(array_unique(array_filter([env('DB_PGSQL_HOST'), 'lerd-postgres', '127.0.0.1', 'localhost'])));
+        $pgUser = (string) env('DB_PGSQL_USERNAME', 'postgres');
+        $pgPass = (string) env('DB_PGSQL_PASSWORD', 'lerd');
+        $pgPort = (int) env('DB_PGSQL_PORT', 5432);
         $pgConnected = false;
         $pgError = null;
         foreach ($pgHosts as $host) {
             try {
-                $dsn = "pgsql:host={$host};port=5432;dbname=lerd;user=postgres;password=lerd";
-                $pdo = new PDO($dsn, 'postgres', 'lerd', [PDO::ATTR_TIMEOUT => 2]);
+                $dsn = "pgsql:host={$host};port={$pgPort};dbname=lerd;user={$pgUser};password={$pgPass}";
+                $pdo = new PDO($dsn, $pgUser, $pgPass, [PDO::ATTR_TIMEOUT => 2]);
                 $version = $pdo->query('SELECT version()')->fetchColumn();
                 echo "\n[POSTGRES CONNECTED via {$host}]: {$version}\n";
                 $pgConnected = true;
@@ -47,13 +50,16 @@ class RealDatabaseIntegrationTest extends TestCase
         }
 
         // Check MySQL connectivity
-        $mysqlHosts = ['lerd-mysql', '127.0.0.1', 'localhost'];
+        $mysqlHosts = array_values(array_unique(array_filter([env('DB_MYSQL_HOST'), 'lerd-mysql', '127.0.0.1', 'localhost'])));
+        $mysqlUser = (string) env('DB_MYSQL_USERNAME', 'root');
+        $mysqlPass = (string) env('DB_MYSQL_PASSWORD', 'lerd');
+        $mysqlPort = (int) env('DB_MYSQL_PORT', 3306);
         $mysqlConnected = false;
         $mysqlError = null;
         foreach ($mysqlHosts as $host) {
             try {
-                $dsn = "mysql:host={$host};port=3306;dbname=lerd";
-                $pdo = new PDO($dsn, 'root', 'lerd', [PDO::ATTR_TIMEOUT => 2]);
+                $dsn = "mysql:host={$host};port={$mysqlPort};dbname=lerd";
+                $pdo = new PDO($dsn, $mysqlUser, $mysqlPass, [PDO::ATTR_TIMEOUT => 2]);
                 $version = $pdo->query('SELECT version()')->fetchColumn();
                 echo "\n[MYSQL CONNECTED via {$host}]: {$version}\n";
                 $mysqlConnected = true;

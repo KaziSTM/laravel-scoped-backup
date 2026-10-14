@@ -20,10 +20,10 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
 
       - name: Install commitlint
-        run: npm install --no-save @commitlint/{config-conventional,cli}
+        run: npm install --no-save @commitlint/config-conventional @commitlint/cli
 
       - name: Lint commits
         env:
