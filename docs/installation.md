@@ -32,15 +32,15 @@ Once the package is available on Packagist, install it via:
 composer require kazistm/laravel-scoped-backup
 ```
 
-### 2. Local Path Repository (Monorepo / Local Development)
+### 2. Local Path Repository (Local Development)
 
-If you are developing the package locally or integrating it into an application monorepo, add a path repository definition to your root application's `composer.json`:
+If you are developing the package locally or integrating it prior to Packagist distribution, add a path repository definition to your application's `composer.json`:
 
 ```json
 "repositories": [
     {
         "type": "path",
-        "url": "packages/laravel-scoped-backup",
+        "url": "../laravel-scoped-backup",
         "options": {
             "symlink": true
         }
@@ -51,10 +51,14 @@ If you are developing the package locally or integrating it into an application 
 }
 ```
 
-Then run:
+> [!NOTE]
+> Adjust the `url` relative to your consuming application's `composer.json` location, or replace it with an appropriate absolute path.
+
+Then update dependencies and regenerate the autoloader:
 
 ```bash
 composer update kazistm/laravel-scoped-backup
+composer dump-autoload
 ```
 
 ---

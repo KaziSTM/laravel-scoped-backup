@@ -72,19 +72,21 @@ For detailed driver options, binary configuration, and engine caveats, see [Data
 
 ### 1. Install via Composer
 
+Once the package is available on Packagist, install it via:
+
 ```bash
 composer require kazistm/laravel-scoped-backup
 ```
 
 ### Local Path Repository (Development)
 
-For local development or testing before public release, configure a Composer path repository pointing to `/lab/packages/laravel-scoped-backup` in your application's `composer.json`:
+For local development or testing before public release, configure a Composer path repository in your application's `composer.json`:
 
 ```json
 "repositories": [
     {
         "type": "path",
-        "url": "/lab/packages/laravel-scoped-backup",
+        "url": "../laravel-scoped-backup",
         "options": {
             "symlink": true
         }
@@ -95,10 +97,14 @@ For local development or testing before public release, configure a Composer pat
 }
 ```
 
-Then update dependencies to create the symlink and regenerate the autoloader:
+> [!NOTE]
+> Adjust the `url` relative to your application's `composer.json` location, or replace it with an appropriate absolute path.
+
+Link the package and regenerate Composer's autoloader:
 
 ```bash
 composer update kazistm/laravel-scoped-backup
+composer dump-autoload
 ```
 
 ### 2. Publish Configuration & Migration
