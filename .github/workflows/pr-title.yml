@@ -1,0 +1,35 @@
+name: PR Title Lint
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  pull-requests: read
+  contents: read
+
+jobs:
+  title:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 🔎 Lint PR title
+        uses: amannn/action-semantic-pull-request@v5
+        with:
+          types: |
+            feat
+            fix
+            chore
+            refactor
+            perf
+            test
+            docs
+            ci
+            build
+            style
+          requireScope: false
+          subjectPattern: ^[a-z].+$
+          subjectPatternError: >
+            Subject must start with a lowercase letter
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

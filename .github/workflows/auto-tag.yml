@@ -1,0 +1,131 @@
+name: Auto Tag
+
+permissions:
+  contents: write
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+
+jobs:
+  tag:
+    if: >
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.event == 'push'
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: 🔧 Configure git
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+
+      - name: 🔍 Determine next version
+        id: semver
+        run: |
+          git fetch --tags
+
+          LAST=$(git tag --list 'v*' --sort=-v:refname | head -n1 | sed 's/^v//')
+          LAST=${LAST:-0.0.0}
+
+          MAJOR=${LAST%%.*}
+          REST=${LAST#*.}
+          MINOR=${REST%%.*}
+          PATCH=${REST##*.}
+
+          # Detect merge commit
+          if git log -1 --pretty=%B | grep -q "^Merge pull request"; then
+            echo "Merge commit detected"
+
+            # Get commits introduced by the merge
+            MSG=$(git log -1 --no-merges --pretty=%s)
+
+            echo "Using merged commit message: $MSG"
+          else
+            MSG=$(git log -1 --pretty=%s)
+            echo "Using direct commit message: $MSG"
+          fi
+
+          if [[ "$MSG" == *"!"* ]]; then
+            MAJOR=$((MAJOR+1)); MINOR=0; PATCH=0
+          elif [[ "$MSG" == feat* ]]; then
+            MINOR=$((MINOR+1)); PATCH=0
+          elif [[ "$MSG" == fix* ]]; then
+            PATCH=$((PATCH+1))
+          else
+            echo "released=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          echo "version=v$MAJOR.$MINOR.$PATCH" >> $GITHUB_OUTPUT
+          echo "released=true" >> $GITHUB_OUTPUT
+
+      - name: 🏷️ Create version tag
+        if: steps.semver.outputs.released == 'true'
+        run: |
+          git tag "${{ steps.semver.outputs.version }}"
+          git push origin "${{ steps.semver.outputs.version }}"
+
+      - name: 📝 Generate changelog
+        id: changelog
+        if: steps.semver.outputs.released == 'true'
+        run: |
+          CURRENT="${{ steps.semver.outputs.version }}"
+          PREVIOUS=$(git describe --tags --abbrev=0 "$CURRENT^" 2>/dev/null || true)
+
+          RANGE=${PREVIOUS:+$PREVIOUS..}$CURRENT
+
+          LOG=$(git log "$RANGE" \
+            --no-merges \
+            --pretty=format:"- %s (%an)")
+
+          [ -z "$LOG" ] && LOG="- No user-facing changes"
+
+          echo "previous=$PREVIOUS" >> $GITHUB_OUTPUT
+          echo "summary<<EOF" >> $GITHUB_OUTPUT
+          echo "$LOG" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: 📣 Notify Discord (version tagged)
+        if: steps.semver.outputs.released == 'true'
+        continue-on-error: true
+        run: |
+          REPO_NAME="Vargo"
+          REPO="${{ github.repository }}"
+          BRANCH="main"
+          VERSION="${{ steps.semver.outputs.version }}"
+          PREVIOUS="${{ steps.changelog.outputs.previous }}"
+          ACTOR="${{ github.actor }}"
+          WORKFLOW_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          CHANGELOG="${{ steps.changelog.outputs.summary }}"
+
+          MESSAGE=$(cat <<EOF
+          🚀 **PRODUCTION — ${REPO_NAME}**
+
+          📦 **Repository:** \`${REPO}\`
+          🌿 **Branch:** \`${BRANCH}\`
+          🏷️ **Current Tag:** **${VERSION}**
+          ⬅️ **Previous Tag:** \`${PREVIOUS:-N/A}\`
+          👤 **Triggered by:** \`${ACTOR}\`
+
+          📝 **Changes since last release**
+          ${CHANGELOG}
+
+          🔗 **Workflow**
+          ${WORKFLOW_URL}
+          EOF
+          )
+
+          SAFE=$(echo "$MESSAGE" | head -c 1900 | jq -Rs .)
+
+          curl -X POST "${{ secrets.DISCORD_WEBHOOK_URL }}" \
+            -H "Content-Type: application/json" \
+            -d "{\"content\": $SAFE}"

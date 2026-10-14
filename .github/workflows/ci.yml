@@ -1,0 +1,72 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        php: [8.2, 8.3, 8.4, 8.5]
+        laravel: [11.*, 12.*, 13.*]
+        exclude:
+          - php: 8.2
+            laravel: 13.*
+          - php: 8.3
+            laravel: 13.*
+          - php: 8.5
+            laravel: 11.*
+          - php: 8.5
+            laravel: 12.*
+
+    name: PHP ${{ matrix.php }} - L${{ matrix.laravel }}
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: ⚙️ Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: mbstring, bcmath, pdo, sqlite, pdo_sqlite
+          tools: composer:v2
+          coverage: none
+
+      - name: 📦 Get Composer cache directory
+        id: composer-cache
+        run: echo "dir=$(composer config cache-files-dir)" >> $GITHUB_OUTPUT
+
+      - name: ♻️ Cache dependencies
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.composer-cache.outputs.dir }}
+          key: ${{ runner.os }}-composer-${{ matrix.php }}-${{ matrix.laravel }}-${{ hashFiles('**/composer.json') }}
+          restore-keys: |
+            ${{ runner.os }}-composer-${{ matrix.php }}-${{ matrix.laravel }}-
+
+      # 🔥 Install dependencies correctly
+      - name: 📦 Install dependencies
+        run: |
+          composer config policy.advisories.block false || true
+          composer update \
+            --with="illuminate/support:${{ matrix.laravel }}" \
+            --with-all-dependencies \
+            --prefer-dist \
+            --no-interaction \
+            --no-progress
+
+      - name: 🧪 Run tests
+        run: vendor/bin/pest --ci
+
+      - name: 🔍 Run PHPStan (report only)
+        run: vendor/bin/phpstan analyse src --level=5 --memory-limit=1G || true

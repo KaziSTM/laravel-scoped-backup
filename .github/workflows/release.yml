@@ -1,0 +1,84 @@
+name: Release
+
+permissions:
+  contents: write
+
+on:
+  push:
+    tags:
+      - release/v*
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 🔎 Resolve version tag
+        id: tag
+        run: |
+          RELEASE_TAG="${GITHUB_REF_NAME}"
+          VERSION_TAG="${RELEASE_TAG#release/}"
+
+          echo "release=$RELEASE_TAG" >> $GITHUB_OUTPUT
+          echo "version=$VERSION_TAG" >> $GITHUB_OUTPUT
+
+      - name: 📝 Generate changelog
+        id: changelog
+        run: |
+          git fetch --tags
+
+          CURRENT="${{ steps.tag.outputs.version }}"
+          PREVIOUS=$(git describe --tags --abbrev=0 "$CURRENT^" 2>/dev/null || true)
+
+          RANGE=${PREVIOUS:+$PREVIOUS..}$CURRENT
+
+          LOG=$(git log "$RANGE" \
+            --no-merges \
+            --pretty=format:"- %s (%an)")
+
+          [ -z "$LOG" ] && LOG="- No user-facing changes"
+
+          echo "previous=$PREVIOUS" >> $GITHUB_OUTPUT
+          echo "summary<<EOF" >> $GITHUB_OUTPUT
+          echo "$LOG" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: 📦 Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ steps.tag.outputs.version }}
+          name: ${{ steps.tag.outputs.version }}
+          body: |
+            ## 🚀 Release ${{ steps.tag.outputs.version }}
+
+            ### Changes since last release
+            ${{ steps.changelog.outputs.summary }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 📣 Notify Discord (release)
+        continue-on-error: true
+        run: |
+          MESSAGE=$(cat <<EOF
+          🚀 **Release ${{ steps.tag.outputs.version }} published**
+
+          📦 **Repository:** \`${{ github.repository }}\`
+          ⬅️ **Previous:** \`${{ steps.changelog.outputs.previous || 'N/A' }}\`
+
+          📝 **Changes**
+          ${{ steps.changelog.outputs.summary }}
+
+          🔗 ${{ github.server_url }}/${{ github.repository }}/releases/tag/${{ steps.tag.outputs.version }}
+          EOF
+          )
+
+          SAFE=$(echo "$MESSAGE" | head -c 1900 | jq -Rs .)
+
+          curl -X POST "${{ secrets.DISCORD_WEBHOOK_URL }}" \
+            -H "Content-Type: application/json" \
+            -d "{\"content\": $SAFE}"

@@ -1,0 +1,30 @@
+name: Commit Lint
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [dev]
+
+jobs:
+  commitlint:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install commitlint
+        run: npm install --no-save @commitlint/{config-conventional,cli}
+
+      - name: Lint commits
+        run: |
+          npx commitlint \
+            --from origin/main \
+            --to HEAD \
+            --verbose
