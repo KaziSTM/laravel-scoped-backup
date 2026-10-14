@@ -38,11 +38,12 @@ it('verifies postgresql environment connectivity and version', function (): void
         $dsn = "pgsql:host={$host};port={$port};dbname={$adminDb};user={$username};password={$password}";
         $pdo = new PDO($dsn, $username, $password, [PDO::ATTR_TIMEOUT => 3, PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
         $version = (string) $pdo->query('SELECT version()')->fetchColumn();
-
-        expect($version)->toContain('PostgreSQL', "PostgreSQL server at {$host}:{$port} must identify as PostgreSQL.");
     } catch (Throwable $e) {
         handleServiceUnavailable('pgsql', $host, $port, $e);
+        return;
     }
+
+    expect($version)->toContain('PostgreSQL');
 });
 
 it('verifies mysql environment connectivity and version', function (): void {
@@ -67,11 +68,12 @@ it('verifies mysql environment connectivity and version', function (): void {
         $dsn = "mysql:host={$host};port={$port};dbname={$adminDb}";
         $pdo = new PDO($dsn, $username, $password, [PDO::ATTR_TIMEOUT => 3, PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
         $version = (string) $pdo->query('SELECT version()')->fetchColumn();
-
-        expect($version)->not->toBeEmpty("MySQL server at {$host}:{$port} must return a valid version string.");
     } catch (Throwable $e) {
         handleServiceUnavailable('mysql', $host, $port, $e);
+        return;
     }
+
+    expect($version)->not->toBeEmpty();
 });
 
 it('verifies mariadb environment connectivity and version', function (): void {
@@ -96,9 +98,10 @@ it('verifies mariadb environment connectivity and version', function (): void {
         $dsn = "mysql:host={$host};port={$port};dbname={$adminDb}";
         $pdo = new PDO($dsn, $username, $password, [PDO::ATTR_TIMEOUT => 3, PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
         $version = (string) $pdo->query('SELECT version()')->fetchColumn();
-
-        expect($version)->toContain('MariaDB', "MariaDB server at {$host}:{$port} must identify as MariaDB.");
     } catch (Throwable $e) {
         handleServiceUnavailable('mariadb', $host, $port, $e);
+        return;
     }
+
+    expect($version)->toContain('MariaDB');
 });

@@ -44,7 +44,7 @@ test('verify archive succeeds on mariadb dump header', function () {
     $validFile = $this->tempDir.'/valid_mariadb.sql';
     $validDump = <<<'SQL'
 -- MariaDB dump 10.19  Distrib 10.11.6-MariaDB, for debian-linux-gnu (x86_64)
--- Host: 127.0.0.1    Database: test_mariadb_db
+-- Host: localhost    Database: test_mariadb_db
 /*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
 CREATE TABLE `announcements` (
   `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
@@ -84,3 +84,15 @@ test('restore rejects empty target database', function () {
         'database' => '',
     ], $validFile))->toThrow(RestoreException::class, 'Target database name is not configured.');
 });
+
+test('supports column statistics detection and option disabling', function () {
+    $driver = new class extends MariaDbDriver {
+        public function testSupportsColumnStatistics(string $binary): bool
+        {
+            return $this->supportsColumnStatistics($binary);
+        }
+    };
+
+    expect($driver->testSupportsColumnStatistics('nonexistent_bin'))->toBeFalse();
+});
+

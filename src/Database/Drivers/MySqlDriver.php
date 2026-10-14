@@ -115,6 +115,18 @@ class MySqlDriver implements DatabaseBackupDriver
 
         $driverKey = $this instanceof MariaDbDriver ? 'mariadb' : 'mysql';
 
+        // MariaDB does not have information_schema.COLUMN_STATISTICS (introduced in MySQL 8.0 mysqldump).
+        // If a binary supporting column-statistics (such as MySQL 8+ mysqldump) is used for MariaDB,
+        // disable it via --column-statistics=0 to prevent error 1109 (Unknown table 'COLUMN_STATISTICS').
+        $columnStatisticsConfig = config("scoped-backup.database.drivers.{$driverKey}.column_statistics");
+        if ($columnStatisticsConfig === false || ($columnStatisticsConfig === null && ($this instanceof MariaDbDriver || $driver === 'mariadb'))) {
+            if ($this->supportsColumnStatistics($binary)) {
+                $command[] = '--column-statistics=0';
+            }
+        } elseif ($columnStatisticsConfig === true) {
+            $command[] = '--column-statistics=1';
+        }
+
         if ((bool) config("scoped-backup.database.drivers.{$driverKey}.routines", true)) {
             $command[] = '--routines';
         }
@@ -306,4 +318,27 @@ class MySqlDriver implements DatabaseBackupDriver
 
         return $sanitized;
     }
+
+    /**
+     * Determine whether the dump binary supports the --column-statistics option.
+     */
+    protected function supportsColumnStatistics(string $binary): bool
+    {
+        static $cache = [];
+
+        if (array_key_exists($binary, $cache)) {
+            return $cache[$binary];
+        }
+
+        try {
+            $process = new Process([$binary, '--help']);
+            $process->run();
+            $output = $process->getOutput();
+
+            return $cache[$binary] = str_contains($output, 'column-statistics');
+        } catch (\Throwable) {
+            return $cache[$binary] = false;
+        }
+    }
 }
+
