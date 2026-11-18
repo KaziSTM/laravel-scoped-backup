@@ -1,5 +1,7 @@
 # Laravel Scoped Backup (`kazistm/laravel-scoped-backup`)
 
+[![Latest Version on Packagist](https://img.shields.io/packagist/v/kazistm/vargo.svg?style=flat-square)](https://packagist.org/packages/kazistm/laravel-scoped-backup)
+[![Total Downloads](https://img.shields.io/packagist/dt/kazistm/vargo.svg?style=flat-square)](https://packagist.org/packages/kazistm/laravel-scoped-backup)
 [![Software License](https://img.shields.io/badge/license-MIT-brightgreen.svg?style=flat-square)](LICENSE.md)
 [![PHP Compatibility](https://badge.laravel.cloud/php-badge/KaziSTM/laravel-scoped-backup)](https://packagist.org/packages/KaziSTM/laravel-scoped-backup)
 [![Laravel Compatibility](https://badge.laravel.cloud/badge/kazistm/laravel-scoped-backup?style=flat)](https://packagist.org/packages/kazistm/laravel-scoped-backup)
